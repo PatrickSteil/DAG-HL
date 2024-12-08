@@ -5,8 +5,9 @@
 #include <vector>
 
 namespace bfs {
-template <typename VertexType = std::uint64_t> class FixedSizedQueue {
-public:
+template <typename VertexType = std::uint64_t>
+class FixedSizedQueue {
+ public:
   explicit FixedSizedQueue(std::size_t size = 0)
       : data(size), read(0), write(0) {}
 
@@ -36,8 +37,9 @@ public:
   std::size_t write;
 };
 
-template <typename GenerationType = std::uint16_t> class GenerationChecker {
-public:
+template <typename GenerationType = std::uint16_t>
+class GenerationChecker {
+ public:
   explicit GenerationChecker(std::size_t size = 0)
       : seen(size, 0), generation(1) {}
 
@@ -70,4 +72,4 @@ public:
   std::vector<GenerationType> seen;
   GenerationType generation;
 };
-} // namespace bfs
+}  // namespace bfs

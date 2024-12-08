@@ -8,7 +8,7 @@ set(CMAKE_CXX_FLAGS "-pipe -march=native -Wfatal-errors -pthread")
 set(CMAKE_CXX_FLAGS_DEBUG "-rdynamic -Werror -Wpedantic -pedantic-errors -Wall -Wextra -Wparentheses -D_GLIBCXX_DEBUG -g -fno-omit-frame-pointer -O0")
 set(CMAKE_CXX_FLAGS_RELEASE "-ffast-math -DNDEBUG -O3")
 
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -g")
+# set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -g")
 
 set(SOURCE_FILES
     main.cpp

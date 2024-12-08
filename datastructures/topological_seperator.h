@@ -1,10 +1,11 @@
 #pragma once
 
-#include "graph.h"
 #include <cmath>
 #include <functional>
 #include <iostream>
 #include <vector>
+
+#include "graph.h"
 
 struct TopologicalSeperator {
   const Graph &graph;
@@ -21,8 +22,7 @@ struct TopologicalSeperator {
         orderRecursive;
     orderRecursive = [&](std::vector<Vertex> &result, std::size_t start,
                          std::size_t end) {
-      if (start >= end)
-        return;
+      if (start >= end) return;
 
       std::size_t totalSize = end - start;
       std::size_t leftSize =

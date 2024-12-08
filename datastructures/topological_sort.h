@@ -11,7 +11,7 @@ struct TopologicalSort {
   std::vector<Vertex> ordering;
 
   TopologicalSort(const Graph &graph) {
-     StatusLog log("Computing a topological ordering");
+    StatusLog log("Computing a topological ordering");
     const std::size_t numVertices = graph.numVertices();
     ordering.reserve(numVertices);
 

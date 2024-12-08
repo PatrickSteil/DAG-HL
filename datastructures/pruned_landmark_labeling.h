@@ -6,6 +6,7 @@
 #define PREFETCH(addr)
 #endif
 
+#include <algorithm>
 #include <array>
 #include <cassert>
 #include <cstdint>
@@ -14,12 +15,12 @@
 #include <thread>
 #include <vector>
 
-#include "bfs_tools.h"
+#include "bfs.h"
 #include "graph.h"
 #include "status_log.h"
 
 struct PLL {
-public:
+ public:
   enum DIRECTION : bool { FWD, BWD };
   struct alignas(64) Label {
     Label(){};
@@ -31,14 +32,16 @@ public:
 
     std::size_t size() const { return nodes.size(); }
     void add(const Vertex hub) { nodes.push_back(hub); };
+    bool contains(const Vertex hub) {
+      return std::find(nodes.begin(), nodes.end(), hub) != nodes.end();
+    };
   };
 
   std::array<std::vector<Label>, 2> labels;
   std::array<std::vector<uint8_t>, 2> lookup;
   std::vector<uint8_t> alreadyProcessed;
   std::array<const Graph *, 2> graph;
-  std::array<bfs::FixedSizedQueue<Vertex>, 2> q;
-  std::array<bfs::GenerationChecker<>, 2> seen;
+  std::array<bfs::BFS, 2> bfs;
 
   PLL(const Graph &fwdGraph, const Graph &bwdGraph)
       : labels{std::vector<Label>(fwdGraph.numVertices()),
@@ -47,10 +50,7 @@ public:
                std::vector<uint8_t>(fwdGraph.numVertices(), false)},
         alreadyProcessed(fwdGraph.numVertices(), false),
         graph{&fwdGraph, &bwdGraph},
-        q{bfs::FixedSizedQueue<Vertex>(fwdGraph.numVertices()),
-          bfs::FixedSizedQueue<Vertex>(fwdGraph.numVertices())},
-        seen{bfs::GenerationChecker<>(fwdGraph.numVertices()),
-             bfs::GenerationChecker<>(fwdGraph.numVertices())} {};
+        bfs{bfs::BFS(fwdGraph), bfs::BFS(bwdGraph)} {};
 
   void run(const std::vector<Vertex> &ordering) {
     StatusLog log("Computing HLs");
@@ -101,7 +101,17 @@ public:
     std::cout << "  Avg Size: " << inAvg << std::endl;
   }
 
-private:
+  void print() const {
+    for (std::size_t v = 0; v < graph[FWD]->numVertices(); ++v) {
+      std::cout << " -> " << v << "\n\t";
+      for (auto h : labels[FWD][v].nodes) std::cout << h << " ";
+      std::cout << "\n <- " << v << "\n\t";
+      for (auto h : labels[BWD][v].nodes) std::cout << h << " ";
+      std::cout << std::endl;
+    }
+  }
+
+ private:
   void init(std::size_t numVertices) {
     labels[BWD].assign(numVertices, Label());
     labels[FWD].assign(numVertices, Label());
@@ -111,15 +121,8 @@ private:
 
     alreadyProcessed.assign(numVertices, false);
 
-    q[FWD].reset();
-    q[BWD].reset();
-    seen[FWD].reset();
-    seen[BWD].reset();
-
-    q[FWD].resize(numVertices);
-    q[BWD].resize(numVertices);
-    seen[FWD].resize(numVertices);
-    seen[BWD].resize(numVertices);
+    bfs[FWD].reset(numVertices);
+    bfs[BWD].reset(numVertices);
   }
 
   void runPrunedBFS(const Vertex v) {
@@ -133,51 +136,25 @@ private:
     modifyLookups(v, true);
 
     auto runOneDirection = [&](const DIRECTION dir) -> void {
-      q[dir].reset();
-      seen[dir].reset();
-
-      q[dir].push(v);
-      seen[dir].mark(v);
-
-      const auto &toVertex = graph[dir]->toVertex;
-
-      while (!q[dir].isEmpty()) {
-        const Vertex u = q[dir].pop();
-
-#pragma GCC unroll 4
-        for (std::size_t i = graph[dir]->beginEdge(u);
-             i < graph[dir]->endEdge(u); ++i) {
-          const Vertex w = toVertex[i];
-
-          bool skip = (seen[dir].isMarked(w) || alreadyProcessed[w]);
-          seen[dir].mark(w);
-
-          if (skip || prune(labels[!dir][w].nodes, lookup[dir]))
-            continue;
-          q[dir].push(w);
-        }
-      }
-    };
-
-    auto addToLabels = [&](const DIRECTION dir) -> void {
-#pragma GCC unroll 4
-      for (std::size_t i = 0; i < q[dir].read; ++i) {
-        if (i + 4 < q[dir].read) {
-          PREFETCH(&labels[!dir][q[dir].data[i + 4]]);
-        }
-
-        assert(i < q[dir].data.size());
-        const Vertex u = q[dir].data[i];
-
-        labels[!dir][u].add(v);
-      }
+      bfs[dir].run(
+          v, [](const Vertex & /* v */) { return false; },
+          [&](const Vertex &w) {
+            return alreadyProcessed[w] ||
+                   prune(labels[!dir][w].nodes, lookup[dir]);
+          });
     };
 
     runOneDirection(FWD);
-    addToLabels(FWD);
+    bfs[FWD].doForAllVerticesInQ([&](const Vertex u) {
+      assert(!labels[BWD][u].contains(v));
+      labels[BWD][u].add(v);
+    });
 
     runOneDirection(BWD);
-    addToLabels(BWD);
+    bfs[BWD].doForAllVerticesInQ([&](const Vertex u) {
+      assert(!labels[FWD][u].contains(v));
+      labels[FWD][u].add(v);
+    });
 
     alreadyProcessed[v] = true;
     modifyLookups(v, false);
