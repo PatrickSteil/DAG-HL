@@ -26,8 +26,8 @@ struct BFS {
     }
   }
 
-  template <typename ON_POP = decltype([](const Vertex &) { return false; }),
-            typename ON_RELAX = decltype([](const Vertex &) { return false; })>
+  template <typename ON_POP = decltype([](const Vertex) { return false; }),
+            typename ON_RELAX = decltype([](const Vertex) { return false; })>
   void run(const Vertex root, ON_POP &&onPop, ON_RELAX &&onRelax) {
     q.reset();
     seen.reset();

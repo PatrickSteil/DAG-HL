@@ -4,7 +4,7 @@ project(HCL)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
-set(CMAKE_CXX_FLAGS "-pipe -march=native -Wfatal-errors -pthread")
+set(CMAKE_CXX_FLAGS "-pipe -march=native -Wfatal-errors -pthread -fopenmp")
 set(CMAKE_CXX_FLAGS_DEBUG "-rdynamic -Werror -Wpedantic -pedantic-errors -Wall -Wextra -Wparentheses -D_GLIBCXX_DEBUG -g -fno-omit-frame-pointer -O0")
 set(CMAKE_CXX_FLAGS_RELEASE "-ffast-math -DNDEBUG -O3")
 

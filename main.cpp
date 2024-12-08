@@ -6,15 +6,28 @@
 
 #include "datastructures/graph.h"
 #include "datastructures/pruned_landmark_labeling.h"
+#include "external/cmdparser.hpp"
+
+void configure_parser(cli::Parser &parser) {
+  parser.set_required<std::string>("i", "input_graph",
+                                   "Input graph in DIMACs format.");
+  parser.set_optional<std::string>("o", "output_file", "",
+                                   "Output file to save hub labels into.");
+  parser.set_optional<int>("t", "num_threads", 1, "Number of threads to use.");
+  parser.set_optional<bool>("s", "show_stats", true,
+                            "Show statistics about the computed hub labels.");
+};
 
 int main(int argc, char *argv[]) {
-  if (argc < 2) {
-    std::cerr << "Usage: " << argv[0] << " <graph_filename>\n"
-              << "  - <graph_filename>: Path to the graph edge list file.\n";
-    return 1;
-  }
+  cli::Parser parser(argc, argv);
 
-  const std::string inputFileName = argv[1];
+  configure_parser(parser);
+  parser.run_and_exit_if_error();
+
+  const std::string inputFileName = parser.get<std::string>("i");
+  const std::string outputFileName = parser.get<std::string>("o");
+  /* const int numThreads = parse.get<int>("t"); */
+  const bool showStats = parser.get<bool>("s");
 
   Graph g;
   g.readDimacs(inputFileName);
@@ -63,6 +76,10 @@ int main(int argc, char *argv[]) {
 
   PLL pll(g, rev);
   pll.run(ordering);
-  pll.showStats();
+  pll.sortAllLabels();
+
+  if (showStats) pll.showStats();
+
+  if (outputFileName != "") pll.saveToFile(outputFileName);
   return 0;
 }
