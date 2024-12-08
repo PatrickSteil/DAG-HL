@@ -113,9 +113,14 @@ struct PLL {
 
   void sortAllLabels() {
     StatusLog log("Sort all labels");
-#pragma om parallel for schedule(dynamic, 32)
+    // split for cache locality
+#pragma om parallel for schedule(dynamic, 64)
     for (std::size_t i = 0; i < labels[FWD].size(); ++i) {
       std::sort(labels[FWD][i].nodes.begin(), labels[FWD][i].nodes.end());
+    }
+
+#pragma om parallel for schedule(dynamic, 64)
+    for (std::size_t i = 0; i < labels[BWD].size(); ++i) {
       std::sort(labels[BWD][i].nodes.begin(), labels[BWD][i].nodes.end());
     }
   }

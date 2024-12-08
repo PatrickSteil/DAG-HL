@@ -14,7 +14,7 @@ void configure_parser(cli::Parser &parser) {
   parser.set_optional<std::string>("o", "output_file", "",
                                    "Output file to save hub labels into.");
   parser.set_optional<int>("t", "num_threads", 1, "Number of threads to use.");
-  parser.set_optional<bool>("s", "show_stats", true,
+  parser.set_optional<bool>("s", "show_stats", false,
                             "Show statistics about the computed hub labels.");
 };
 
@@ -27,7 +27,7 @@ int main(int argc, char *argv[]) {
   const std::string inputFileName = parser.get<std::string>("i");
   const std::string outputFileName = parser.get<std::string>("o");
   /* const int numThreads = parse.get<int>("t"); */
-  const bool showStats = parser.get<bool>("s");
+  const auto showStats = parser.get<bool>("s");
 
   Graph g;
   g.readDimacs(inputFileName);
