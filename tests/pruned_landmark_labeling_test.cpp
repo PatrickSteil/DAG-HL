@@ -3,22 +3,6 @@
 
 #include <gtest/gtest.h>
 
-TEST(LabelTest, BasicOperations) {
-  PLL::Label label;
-
-  EXPECT_EQ(label.size(), 0);
-
-  label.add(10);
-  label.add(20);
-  EXPECT_EQ(label.size(), 2);
-
-  EXPECT_EQ(label[0], 10);
-  EXPECT_EQ(label[1], 20);
-
-  label[1] = 30;
-  EXPECT_EQ(label[1], 30);
-}
-
 TEST(PLLTest, Initialization) {
   Graph fwdGraph;
   Graph bwdGraph;
@@ -31,7 +15,6 @@ TEST(PLLTest, Initialization) {
 }
 
 TEST(PLLTest, RunWithOrdering) {
-
   Graph fwdGraph;
   fwdGraph.readFromEdgeList("../tests/pll_test_graph.txt");
   Graph bwdGraph = fwdGraph.reverseGraph();

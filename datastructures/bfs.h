@@ -3,6 +3,9 @@
 #include "graph.h"
 
 namespace bfs {
+
+auto noOp = [](const Vertex /* v */) { return false; };
+
 struct BFS {
   const Graph &graph;
   FixedSizedQueue<Vertex> q;

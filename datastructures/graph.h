@@ -5,14 +5,23 @@
 #include <cstdint>
 #include <fstream>
 #include <iostream>
+#include <limits>
 #include <sstream>
 #include <string>
 #include <tuple>
 #include <vector>
 
 #include "status_log.h"
+#include "types.h"
 
-using Vertex = std::uint32_t;
+struct Edge {
+  Vertex from;
+  Vertex to;
+
+  Edge(Vertex from, Vertex to) : from(from), to(to) {}
+
+  auto operator<=>(const Edge &other) const = default;
+};
 
 struct Graph {
   std::vector<std::size_t> adjArray;
@@ -257,5 +266,55 @@ struct Graph {
     }
 
     return reversed;
+  }
+
+  void showStats() const {
+    if (numVertices() == 0) {
+      std::cout << "Graph is empty.\n";
+      return;
+    }
+
+    std::size_t minDegree = std::numeric_limits<std::size_t>::max();
+    std::size_t maxDegree = 0;
+    std::size_t totalDegree = 0;
+
+    for (Vertex v = 0; v < numVertices(); ++v) {
+      std::size_t deg = degree(v);
+      minDegree = std::min(minDegree, deg);
+      maxDegree = std::max(maxDegree, deg);
+      totalDegree += deg;
+    }
+
+    double avgDegree = static_cast<double>(totalDegree) / numVertices();
+
+    std::cout << "Graph Statistics:\n";
+    std::cout << "  Number of vertices: " << numVertices() << "\n";
+    std::cout << "  Number of edges:    " << numEdges() << "\n";
+    std::cout << "  Min degree:         " << minDegree << "\n";
+    std::cout << "  Max degree:         " << maxDegree << "\n";
+    std::cout << "  Average degree:     " << avgDegree << "\n";
+  }
+};
+
+struct Tree {
+  std::vector<Vertex> parent;
+
+  Tree(const std::size_t numVertices = 0) : parent(numVertices, noVertex){};
+  Tree(const Tree &) = default;
+  Tree(Tree &&) = default;
+
+  void resize(const std::size_t numVertices) {
+    parent.assign(numVertices, noVertex);
+  }
+
+  bool isValid(const Vertex v) const {
+    return v < parent.size() && v != noVertex;
+  };
+
+  void setParent(const Vertex v, const Vertex par) {
+    assert(isValid(v));
+    assert(isValid(par));
+
+    parent[v] = par;
   }
 };
