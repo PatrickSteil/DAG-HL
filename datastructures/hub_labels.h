@@ -1,3 +1,5 @@
+#pragma once
+
 #include <algorithm>
 #include <array>
 #include <fstream>
@@ -51,6 +53,27 @@ struct Label {
     nodes = std::move(new_nodes);
   }
 };
+
+bool query(std::array<std::vector<Label>, 2> &labels, const Vertex from,
+           const Vertex to) {
+  std::size_t i = 0;
+  std::size_t j = 0;
+
+  const auto &fromLabels = labels[FWD][from];
+  const auto &toLabels = labels[BWD][to];
+
+  while (i < fromLabels.size() && j < toLabels.size()) {
+    if (fromLabels[i] == toLabels[j]) return true;
+
+    if (fromLabels[i] < toLabels[j]) {
+      i++;
+    } else {
+      j++;
+    }
+  }
+
+  return false;
+}
 
 void saveToFile(std::array<std::vector<Label>, 2> &labels,
                 const std::string &fileName) {

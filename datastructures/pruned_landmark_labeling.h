@@ -20,26 +20,27 @@
 
 #include "bfs.h"
 #include "graph.h"
+#include "hub_labels.h"
 #include "status_log.h"
 
 struct PLL {
  public:
-  enum DIRECTION : bool { FWD, BWD };
-  struct alignas(64) Label {
-    Label(){};
+  /* enum DIRECTION : bool { FWD, BWD }; */
+  /* struct alignas(64) Label { */
+  /*   Label(){}; */
 
-    std::vector<Vertex> nodes;
+  /*   std::vector<Vertex> nodes; */
 
-    Vertex &operator[](std::size_t i) { return nodes[i]; }
-    const Vertex &operator[](std::size_t i) const { return nodes[i]; }
+  /*   Vertex &operator[](std::size_t i) { return nodes[i]; } */
+  /*   const Vertex &operator[](std::size_t i) const { return nodes[i]; } */
 
-    void reserve(const std::size_t size) { nodes.reserve(size); };
-    std::size_t size() const { return nodes.size(); };
-    void add(const Vertex hub) { nodes.push_back(hub); };
-    bool contains(const Vertex hub) {
-      return std::find(nodes.begin(), nodes.end(), hub) != nodes.end();
-    };
-  };
+  /*   void reserve(const std::size_t size) { nodes.reserve(size); }; */
+  /*   std::size_t size() const { return nodes.size(); }; */
+  /*   void add(const Vertex hub) { nodes.push_back(hub); }; */
+  /*   bool contains(const Vertex hub) { */
+  /*     return std::find(nodes.begin(), nodes.end(), hub) != nodes.end(); */
+  /*   }; */
+  /* }; */
 
   std::array<std::vector<Label>, 2> labels;
   std::array<std::vector<uint8_t>, 2> lookup;
