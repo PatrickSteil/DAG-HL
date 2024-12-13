@@ -154,55 +154,6 @@ struct RXL {
     }
   }
 
-  void sortAllLabels() {
-    StatusLog log("Sort all labels");
-    // split for cache locality
-#ifdef USE_OMP
-#pragma omp parallel for schedule(dynamic, 64)
-#endif
-    for (std::size_t i = 0; i < labels[FWD].size(); ++i) {
-      std::sort(labels[FWD][i].nodes.begin(), labels[FWD][i].nodes.end());
-    }
-
-#ifdef USE_OMP
-#pragma omp parallel for schedule(dynamic, 64)
-#endif
-    for (std::size_t i = 0; i < labels[BWD].size(); ++i) {
-      std::sort(labels[BWD][i].nodes.begin(), labels[BWD][i].nodes.end());
-    }
-  }
-
-  void saveToFile(const std::string &fileName) {
-    std::ofstream outFile(fileName);
-
-    if (!outFile.is_open()) {
-      std::cerr << "Error: Unable to open file " << fileName
-                << " for writing.\n";
-      return;
-    }
-
-    for (std::size_t v = 0; v < graph[FWD]->numVertices(); ++v) {
-      outFile << "o";
-      for (const Vertex hub : labels[FWD][v].nodes) {
-        outFile << " " << hub;
-      }
-      outFile << "\n";
-
-      outFile << "i";
-      for (const Vertex hub : labels[BWD][v].nodes) {
-        outFile << " " << hub;
-      }
-      outFile << "\n";
-    }
-
-    outFile.close();
-    if (outFile.fail()) {
-      std::cerr << "Error: Writing to file " << fileName << " failed.\n";
-    } else {
-      std::cout << "Labels saved successfully to " << fileName << "\n";
-    }
-  }
-
   std::vector<Vertex> getOrdering() {
     std::vector<Vertex> ordering(graph[FWD]->numVertices(), 0);
 

@@ -1,14 +1,17 @@
 #include <algorithm>
 #include <array>
+#include <fstream>
 #include <numeric>
+#include <sstream>
 #include <vector>
 
 #include "priority_queue.h"
+#include "status_log.h"
 #include "types.h"
 
 enum DIRECTION : bool { FWD, BWD };
 
-struct alignas(64) Label {
+struct Label {
   Label(){};
 
   std::vector<Vertex> nodes;
@@ -49,8 +52,94 @@ struct alignas(64) Label {
   }
 };
 
+void saveToFile(std::array<std::vector<Label>, 2> &labels,
+                const std::string &fileName) {
+  std::ofstream outFile(fileName);
+
+  if (!outFile.is_open()) {
+    std::cerr << "Error: Unable to open file " << fileName << " for writing.\n";
+    return;
+  }
+
+  std::size_t N = labels[FWD].size();
+
+  for (std::size_t v = 0; v < N; ++v) {
+    outFile << "o";
+    for (const Vertex hub : labels[FWD][v].nodes) {
+      outFile << " " << hub;
+    }
+    outFile << "\n";
+
+    outFile << "i";
+    for (const Vertex hub : labels[BWD][v].nodes) {
+      outFile << " " << hub;
+    }
+    outFile << "\n";
+  }
+
+  outFile.close();
+  if (outFile.fail()) {
+    std::cerr << "Error: Writing to file " << fileName << " failed.\n";
+  } else {
+    std::cout << "Labels saved successfully to " << fileName << "\n";
+  }
+}
+
+void readFromFile(std::array<std::vector<Label>, 2> &labels,
+                  const std::string &fileName) {
+  std::ifstream inFile(fileName);
+
+  if (!inFile.is_open()) {
+    std::cerr << "Error: Unable to open file " << fileName << " for reading.\n";
+    return;
+  }
+
+  std::string line;
+  std::size_t vertexIndex = 0;
+
+  while (std::getline(inFile, line)) {
+    if (line.empty()) {
+      continue;
+    }
+
+    char labelType = line[0];
+
+    if (labelType != 'o' && labelType != 'i') {
+      std::cerr << "Error: Unexpected line format: " << line << "\n";
+      continue;
+    }
+
+    std::vector<Vertex> hubs;
+    std::istringstream iss(line.substr(1));
+    Vertex hub;
+    while (iss >> hub) {
+      hubs.push_back(hub);
+    }
+
+    while (labels[FWD].size() <= vertexIndex) {
+      labels[FWD].emplace_back();
+      labels[BWD].emplace_back();
+    }
+
+    if (labelType == 'o') {
+      labels[FWD][vertexIndex].nodes = std::move(hubs);
+    } else if (labelType == 'i') {
+      labels[BWD][vertexIndex].nodes = std::move(hubs);
+      ++vertexIndex;
+    }
+  }
+
+  inFile.close();
+  if (inFile.fail()) {
+    std::cerr << "Error: Reading from file " << fileName << " failed.\n";
+  } else {
+    std::cout << "Labels loaded successfully from " << fileName << "\n";
+  }
+}
+
 std::vector<Vertex> computePermutation(
     const std::array<std::vector<Label>, 2> &labels) {
+  StatusLog log("Compute Hub permutation");
   const std::size_t numVertices = labels[0].size();
   std::vector<Vertex> result(numVertices);
   std::iota(result.begin(), result.end(), 0);
@@ -78,4 +167,17 @@ std::vector<Vertex> computePermutation(
   }
 
   return result;
+}
+
+void sortLabels(std::array<std::vector<Label>, 2> &labels) {
+  StatusLog log("Sort all labels");
+#pragma omp parallel for schedule(dynamic, 64)
+  for (std::size_t i = 0; i < labels[FWD].size(); ++i) {
+    std::sort(labels[FWD][i].nodes.begin(), labels[FWD][i].nodes.end());
+  }
+
+#pragma omp parallel for schedule(dynamic, 64)
+  for (std::size_t i = 0; i < labels[BWD].size(); ++i) {
+    std::sort(labels[BWD][i].nodes.begin(), labels[BWD][i].nodes.end());
+  }
 }

@@ -59,29 +59,11 @@ int main(int argc, char *argv[]) {
       hl.labels[1][v].applyPermutation(permutation);
     }
   }
-  hl.sortAllLabels();
 
-  /* std::size_t maxDiff = 0; */
-
-  /* for (Vertex v = 0; v < g.numVertices(); ++v) { */
-  /*   for (std::size_t i = 1; i < hl.labels[0][v].size(); ++i) { */
-  /*     maxDiff = std::max(maxDiff, */
-  /*                        static_cast<std::size_t>(hl.labels[0][v][i] - */
-  /*                                                 hl.labels[0][v][i - 1] -
-   * 1)); */
-  /*   } */
-  /*   for (std::size_t i = 1; i < hl.labels[1][v].size(); ++i) { */
-  /*     maxDiff = std::max(maxDiff, */
-  /*                        static_cast<std::size_t>(hl.labels[1][v][i] - */
-  /*                                                 hl.labels[1][v][i - 1] -
-   * 1)); */
-  /*   } */
-  /* } */
-
-  /* std::cout << "Max diff: " << maxDiff << std::endl; */
+  sortLabels(hl.labels);
 
   if (showStats) hl.showStats();
 
-  if (outputFileName != "") hl.saveToFile(outputFileName);
+  if (outputFileName != "") saveToFile(hl.labels, outputFileName);
   return 0;
 }
