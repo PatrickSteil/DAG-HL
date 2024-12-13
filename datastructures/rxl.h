@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <array>
 #include <cassert>
+#include <cmath>
 #include <cstdint>
 #include <fstream>
 #include <iostream>
@@ -215,64 +216,30 @@ struct RXL {
     return ordering;
   }
 
-  void sample() {
-    /* std::vector<Vertex> sample = std::move(sampleKVertices()); */
-    std::vector<Vertex> sample(K, 0);
-    std::iota(sample.begin(), sample.end(), 0);
+  std::vector<Vertex> getOrderingDegTopo() {
+    std::vector<Vertex> ordering(graph[FWD]->numVertices(), 0);
 
-    for (std::size_t i = 0;
-         i < std::min(sample.size(), graph[FWD]->numVertices()); ++i) {
-      const Vertex v = sample[i];
-      counter[FWD][v].values[i] = 1;
-      counter[BWD][v].values[i] = 1;
-    }
-    for (std::size_t i = 0;
-         i < std::min(sample.size(), graph[FWD]->numVertices()); ++i) {
-      const Vertex v = sample[i];
-      counter[BWD][v].values[i] = 1;
-      counter[BWD][v].values[i] = 1;
+    TopologicalSort sorter(*graph[FWD]);
+    std::vector<std::size_t> topoRank(graph[FWD]->numVertices(), 0);
+
+    for (std::size_t i = 0; i < sorter.ordering.size(); ++i) {
+      topoRank[sorter.ordering[i]] = i;
     }
 
-    StatusLog log("sweep");
+    std::iota(ordering.begin(), ordering.end(), 0);
 
-    for (std::size_t i = 0; i < topoEdges.size(); ++i) {
-      if (i + 4 < topoEdges.size()) {
-        PREFETCH(&counter[BWD][topoEdges[i + 4].from]);
-        PREFETCH(&counter[BWD][topoEdges[i + 4].to]);
-      }
-      const Edge &edge = topoEdges[i];
-      counter[BWD][edge.to] += counter[BWD][edge.from];
-    }
+    auto rank = [&](auto v) -> double {
+      double centrality = 1 - abs((topoRank[v] / topoRank.size()) - 0.5);
+      return 0.5 * (graph[FWD]->degree(v) + graph[BWD]->degree(v)) +
+             1000 * centrality;
+    };
 
-    for (std::size_t i = topoEdges.size(); i-- > 0;) {
-      if (i >= 4) {
-        PREFETCH(&counter[FWD][topoEdges[i - 4].from]);
-        PREFETCH(&counter[FWD][topoEdges[i - 4].to]);
-      }
-      const Edge &edge = topoEdges[i];
-      counter[FWD][edge.from] += counter[FWD][edge.to];
-    }
+    std::sort(ordering.begin(), ordering.end(),
+              [&](const auto left, const auto right) {
+                return rank(left) > rank(right);
+              });
 
-    for (std::size_t v = 0; v < graph[FWD]->numVertices(); ++v) {
-      std::cout << "Vertex " << v << std::endl;
-      for (const auto val : counter[BWD][v].values) {
-        std::cout << val << " ";
-      }
-      std::cout << std::endl;
-      for (const auto val : counter[FWD][v].values) {
-        std::cout << val << " ";
-      }
-      std::cout << std::endl;
-      std::size_t sum = 0;
-      std::cout << "\tSUM:\n";
-      counter[FWD][v] += counter[BWD][v];
-      for (const auto val : counter[FWD][v].values) {
-        std::cout << val << " ";
-        sum += val;
-      }
-      std::cout << std::endl;
-      std::cout << "\tTotal Sum: " << sum << std::endl;
-    }
+    return ordering;
   }
 
   bool isOrdering(const std::vector<Vertex> &ordering,
@@ -389,26 +356,5 @@ struct RXL {
     std::shuffle(sample.begin(), sample.end(), g);
     sample.resize(std::min(static_cast<std::size_t>(K), sample.size()));
     return sample;
-  }
-
-  std::size_t computeDescendants(const Vertex v) {
-    assert(v < alreadyProcessed.size());
-    std::size_t result = 0;
-    bfs[FWD].run(
-        v,
-        [&result](const Vertex /* w */) {
-          ++result;
-          return false;
-        },
-        [this](const Vertex w) { return alreadyProcessed[w]; });
-    bfs[BWD].run(
-        v,
-        [&result](const Vertex /* w */) {
-          ++result;
-          return false;
-        },
-        [this](const Vertex w) { return alreadyProcessed[w]; });
-
-    return result;
   }
 };

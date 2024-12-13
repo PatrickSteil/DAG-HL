@@ -146,7 +146,7 @@ class PriorityQueue {
     return heap.front();
   }
 
-  void buildFrom(const std::vector<uint32_t> &values) {
+  void buildFrom(std::vector<uint32_t> &values) {
     mapper.clear();
     heap.clear();
 

@@ -1,6 +1,9 @@
 #include <algorithm>
+#include <array>
+#include <numeric>
 #include <vector>
 
+#include "priority_queue.h"
 #include "types.h"
 
 enum DIRECTION : bool { FWD, BWD };
@@ -45,3 +48,34 @@ struct alignas(64) Label {
     nodes = std::move(new_nodes);
   }
 };
+
+std::vector<Vertex> computePermutation(
+    const std::array<std::vector<Label>, 2> &labels) {
+  const std::size_t numVertices = labels[0].size();
+  std::vector<Vertex> result(numVertices);
+  std::iota(result.begin(), result.end(), 0);
+
+  std::vector<std::uint32_t> freq(numVertices, 0);
+
+  for (DIRECTION dir : {FWD, BWD}) {
+    for (auto &lab : labels[dir]) {
+      for (const auto h : lab.nodes) {
+        freq[h]++;
+      }
+    }
+  }
+
+  PriorityQueue<std::greater<std::uint32_t>> q;
+  q.buildFrom(freq);
+
+  Vertex id(0);
+  while (!q.empty()) {
+    auto [occur, hub] = q.pop();
+    assert(hub != noVertex);
+
+    result[hub] = id;
+    ++id;
+  }
+
+  return result;
+}
