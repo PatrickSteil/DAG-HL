@@ -1,6 +1,6 @@
 #!/usr/bin/bash
 
-mkdir -p build-release  build-debug build-san
+mkdir -p build-release build-debug build-san
 
 cd build-release
 cmake -DCMAKE_BUILD_TYPE=Release ..

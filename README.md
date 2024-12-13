@@ -1,11 +1,21 @@
 # Hub Labeling
 Author: Patrick Steil
 
+This repository implements a hub labeling algorithm for reachability requests on DAGs. No shortest path distances are computed or stored.
+
 ## Build Instructions
 To build the project, run the provided build.sh script:
 
 ```bash
 ./build.sh
+```
+
+Or if you only want to build the release version, call:
+
+```bash
+mkdir -p build-release 
+cd build-release
+cmake -DCMAKE_BUILD_TYPE=Release ..
 ```
 
 The project supports three build configurations:
