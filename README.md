@@ -72,8 +72,8 @@ i 0 3
 
 ```bash
 >> ./HCL -i icice.dimacs.gr -s -c -b
-Reading graph from dimacs ... done [192ms]
-Graph Statistics:
+Reading graph from dimacs ... done [189ms]
+Forward Graph Statistics:
   Number of vertices: 186068
   Number of edges:    586679
   Min degree:         0
@@ -81,9 +81,9 @@ Graph Statistics:
   Average degree:     3.15304
 Reversing Graph ... done [3ms]
 Computing a topological ordering ... done [6ms]
-Computing HLs using RXL ... done [3211ms]
-Compute Hub permutation ... done [54ms]
-Sort all labels ... done [18ms]
+Computing HLs ... done [3180ms]
+Compute Hub permutation ... done [56ms]
+Sort all labels ... done [24ms]
 Forward Labels Statistics:
   Min Size: 1
   Max Size: 232
@@ -94,5 +94,5 @@ Backward Labels Statistics:
   Avg Size: 42.7483
 Total memory consumption [megabytes]:
   117.881
-The 10000 random queries took in total 196659 [ms] and on average 19.6659 [ns]!
+The 10000 random queries took in total 200523 [ms] and on average 20.0523 [ns]!
 ```
