@@ -1,5 +1,13 @@
 #pragma once
 
+#ifdef __GNUC__
+#define PREFETCH(addr) __builtin_prefetch(addr)
+#else
+#define PREFETCH(addr)
+#endif
+
+#include <omp.h>
+
 #include <algorithm>
 #include <array>
 #include <fstream>
@@ -194,12 +202,13 @@ std::vector<Vertex> computePermutation(
 
 void sortLabels(std::array<std::vector<Label>, 2> &labels) {
   StatusLog log("Sort all labels");
-#pragma omp parallel for schedule(dynamic, 64)
+
+#pragma omp parallel for
   for (std::size_t i = 0; i < labels[FWD].size(); ++i) {
     std::sort(labels[FWD][i].nodes.begin(), labels[FWD][i].nodes.end());
   }
 
-#pragma omp parallel for schedule(dynamic, 64)
+#pragma omp parallel for
   for (std::size_t i = 0; i < labels[BWD].size(); ++i) {
     std::sort(labels[BWD][i].nodes.begin(), labels[BWD][i].nodes.end());
   }

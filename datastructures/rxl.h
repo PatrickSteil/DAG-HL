@@ -7,6 +7,7 @@
 #endif
 
 #include <immintrin.h>
+#include <omp.h>
 
 #include <algorithm>
 #include <array>
@@ -16,9 +17,6 @@
 #include <fstream>
 #include <iostream>
 #include <limits>
-#ifdef USE_OMP
-#include <omp.h>
-#endif
 #include <random>
 #include <set>
 #include <thread>
@@ -75,21 +73,20 @@ struct RXL {
     init(fwdGraph.numVertices());
   };
 
-  void run(const int numThreads = 1) {
-    StatusLog log("Computing HLs using RXL");
+  void run(const std::string &orderingFileName, const int numThreads = 1) {
+    StatusLog log("Computing HLs");
     assert(graph[FWD]->numVertices() == graph[BWD]->numVertices());
     assert(graph[FWD]->numEdges() == graph[BWD]->numEdges());
 
-#ifdef USE_OMP
     omp_set_num_threads(numThreads);
-#endif
 
     const std::size_t numVertices = graph[FWD]->numVertices();
 
-    std::vector<Vertex> ordering = getOrdering();
+    std::vector<Vertex> ordering = getOrdering(orderingFileName);
 
     assert(ordering.size() == numVertices);
     assert(isOrdering(ordering, numVertices));
+
     for (std::size_t i = 0; i < numVertices; ++i) {
       runPrunedBFS(ordering[i]);
     }
@@ -154,16 +151,38 @@ struct RXL {
     }
   }
 
-  std::vector<Vertex> getOrdering() {
-    std::vector<Vertex> ordering(graph[FWD]->numVertices(), 0);
+  std::vector<Vertex> getOrdering(const std::string &fileName) {
+    std::vector<Vertex> ordering;
+    ordering.reserve(graph[FWD]->numVertices());
 
-    std::iota(ordering.begin(), ordering.end(), 0);
-    std::sort(ordering.begin(), ordering.end(),
-              [&](const auto left, const auto right) {
-                return graph[FWD]->degree(left) + graph[BWD]->degree(left) >
-                       graph[FWD]->degree(right) + graph[BWD]->degree(right);
-              });
+    if (fileName == "") {
+      ordering.assign(graph[FWD]->numVertices(), 0);
 
+      std::iota(ordering.begin(), ordering.end(), 0);
+      std::sort(ordering.begin(), ordering.end(),
+                [&](const auto left, const auto right) {
+                  return graph[FWD]->degree(left) + graph[BWD]->degree(left) >
+                         graph[FWD]->degree(right) + graph[BWD]->degree(right);
+                });
+    } else {
+      std::ifstream file(fileName);
+      if (!file.is_open()) {
+        throw std::runtime_error("Failed to open file: " + fileName);
+      }
+
+      std::string line;
+      while (std::getline(file, line)) {
+        std::istringstream iss(line);
+        Vertex vertex;
+        double centrality;
+
+        if (iss >> vertex >> centrality) {
+          ordering.push_back(vertex - 1);
+        } else {
+          throw std::runtime_error("Failed to parse line: " + line);
+        }
+      }
+    }
     return ordering;
   }
 

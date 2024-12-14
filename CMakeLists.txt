@@ -6,9 +6,6 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Add options for OpenMP and sanitizers
-option(USE_OMP "Enable OpenMP support" ON)
-
 # Set compiler flags for different build types
 set(CMAKE_CXX_FLAGS "-pipe -march=native -Wfatal-errors -pthread")
 set(CMAKE_CXX_FLAGS_RELEASE "-ffast-math -DNDEBUG -O3")
@@ -37,16 +34,13 @@ set(HEADER_FILES
 add_executable(${PROJECT_NAME} ${SOURCE_FILES})
 target_include_directories(${PROJECT_NAME} PUBLIC datastructures)
 
-# Enable OpenMP if requested
-if(USE_OMP)
-    find_package(OpenMP REQUIRED)
-    if(OpenMP_CXX_FOUND)
-        target_compile_options(${PROJECT_NAME} PRIVATE ${OpenMP_CXX_FLAGS})
-        target_link_libraries(${PROJECT_NAME} PUBLIC OpenMP::OpenMP_CXX)
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_OMP")
-    else()
-        message(FATAL_ERROR "OpenMP requested but not found")
-    endif()
+find_package(OpenMP REQUIRED)
+if(OpenMP_CXX_FOUND)
+    target_compile_options(${PROJECT_NAME} PRIVATE ${OpenMP_CXX_FLAGS})
+    target_link_libraries(${PROJECT_NAME} PUBLIC OpenMP::OpenMP_CXX)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_OMP")
+else()
+    message(FATAL_ERROR "OpenMP requested but not found")
 endif()
 
 # Enable testing
@@ -63,7 +57,7 @@ target_include_directories(${PROJECT_NAME}_test PUBLIC datastructures)
 find_package(GTest REQUIRED)
 target_link_libraries(${PROJECT_NAME}_test PRIVATE GTest::gtest_main GTest::gmock_main)
 
-if(USE_OMP AND OpenMP_CXX_FOUND)
+if(OpenMP_CXX_FOUND)
     target_link_libraries(${PROJECT_NAME}_test PUBLIC OpenMP::OpenMP_CXX)
 endif()
 

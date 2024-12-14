@@ -1,4 +1,5 @@
 #pragma once
+#include "../external/statistics_collecter.h"
 #include "bfs_tools.h"
 #include "graph.h"
 
@@ -6,19 +7,42 @@ namespace bfs {
 
 auto noOp = [](const Vertex /* v */) { return false; };
 
+enum BFS_METRICS {
+  NUM_PUSHED_VERTICES,
+  NUM_POPPED_VERTICES,
+  NUM_RELAXED_EDGES,
+  NUM_PRUNED_VERTICES
+};
+
+static std::vector<std::string> BFS_METRICS_NAMES = {
+    "\"# of pushed vertices:\"",
+    "\"# of popped vertices:\"",
+    "\"# of relaxed edges:\"",
+    "\"# of pruned vertices:\"",
+};
+
 struct BFS {
   const Graph &graph;
   FixedSizedQueue<Vertex> q;
   GenerationChecker<> seen;
 
+  StatisticsCollecter statsCollecter;
+
   BFS(const Graph &graph)
-      : graph(graph), q(graph.numVertices()), seen(graph.numVertices()){};
+      : graph(graph),
+        q(graph.numVertices()),
+        seen(graph.numVertices()),
+        statsCollecter(BFS_METRICS_NAMES){};
+
+  void showStats() { statsCollecter.printStats(); }
 
   void reset(const std::size_t numVertices) {
     q.reset();
     q.resize(numVertices);
     seen.reset();
     seen.resize(numVertices);
+
+    statsCollecter.clear();
   }
 
   template <typename FUNC>
@@ -34,23 +58,31 @@ struct BFS {
   void run(const Vertex root, ON_POP &&onPop, ON_RELAX &&onRelax) {
     q.reset();
     seen.reset();
+    statsCollecter.newRound();
 
+    /* statsCollecter.count(NUM_PUSHED_VERTICES); */
     q.push(root);
     seen.mark(root);
 
     while (!q.isEmpty()) {
       const Vertex u = q.pop();
+      /* statsCollecter.count(NUM_POPPED_VERTICES); */
 
       if (onPop(u)) continue;
 
       for (std::size_t i = graph.beginEdge(u); i < graph.endEdge(u); ++i) {
+        /* statsCollecter.count(NUM_RELAXED_EDGES); */
         const Vertex w = graph.toVertex[i];
 
         if (seen.isMarked(w)) continue;
         seen.mark(w);
 
-        if (onRelax(w)) continue;
+        if (onRelax(w)) {
+          /* statsCollecter.count(NUM_PRUNED_VERTICES); */
+          continue;
+        }
 
+        /* statsCollecter.count(NUM_PUSHED_VERTICES); */
         q.push(w);
       }
     }

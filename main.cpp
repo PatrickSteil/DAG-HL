@@ -17,6 +17,9 @@ void configure_parser(cli::Parser &parser) {
                                    "Input graph in DIMACs format.");
   parser.set_optional<std::string>("o", "output_file", "",
                                    "Output file to save hub labels into.");
+  parser.set_optional<std::string>(
+      "r", "ordering_file", "",
+      "File containing the ordering and the centrality measure _per line_");
   parser.set_optional<int>("t", "num_threads",
                            std::thread::hardware_concurrency(),
                            "Number of threads to use.");
@@ -56,6 +59,7 @@ int main(int argc, char *argv[]) {
 
   const std::string inputFileName = parser.get<std::string>("i");
   const std::string outputFileName = parser.get<std::string>("o");
+  const std::string orderingFile = parser.get<std::string>("r");
   const int numThreads = parser.get<int>("t");
   const auto showStats = parser.get<bool>("s");
   const auto compress = parser.get<bool>("c");
@@ -69,12 +73,16 @@ int main(int argc, char *argv[]) {
   Graph g;
   g.readDimacs(inputFileName);
 
-  if (showStats) g.showStats();
+  if (showStats) {
+    std::cout << "Forward ";
+    g.showStats();
+  }
 
   Graph rev = g.reverseGraph();
 
   RXL<> hl(g, rev);
-  hl.run(numThreads);
+
+  hl.run(orderingFile, numThreads);
 
   if (compress) {
     auto permutation = computePermutation(hl.labels);
