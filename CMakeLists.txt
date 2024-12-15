@@ -50,6 +50,7 @@ enable_testing()
 add_executable(${PROJECT_NAME}_test 
     tests/pruned_landmark_labeling_test.cpp 
     tests/graph_test.cpp 
+    tests/utils_test.cpp 
     tests/priority_queue_test.cpp 
 )
 target_include_directories(${PROJECT_NAME}_test PUBLIC datastructures)

@@ -82,7 +82,7 @@ int main(int argc, char *argv[]) {
 
   RXL<> hl(g, rev);
 
-  hl.run(orderingFile, numThreads);
+  hl.run(orderingFile);
 
   if (compress) {
     auto permutation = computePermutation(hl.labels);

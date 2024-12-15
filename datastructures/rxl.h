@@ -13,13 +13,13 @@
 #include <array>
 #include <cassert>
 #include <cmath>
+#include <concepts>
 #include <cstdint>
 #include <fstream>
 #include <iostream>
 #include <limits>
 #include <random>
 #include <set>
-#include <thread>
 #include <vector>
 
 #include "bfs.h"
@@ -27,58 +27,76 @@
 #include "hub_labels.h"
 #include "status_log.h"
 #include "topological_sort.h"
+#include "utils.h"
 
-template <int K = 64>
+template <std::integral SIZE = uint64_t>
 struct RXL {
  public:
-  union alignas(64) PathCounter {
-    PathCounter(std::uint32_t value = 0) {
-      std::fill(std::begin(values), std::end(values), value);
-    }
-    __m256i mValues;
-    std::uint32_t values[8];
-
-    PathCounter operator+(const PathCounter &other) const {
-      PathCounter result;
-      result.mValues = _mm256_add_epi32(this->mValues, other.mValues);
-      return result;
-    }
-
-    PathCounter &operator+=(const PathCounter &other) {
-      this->mValues = _mm256_add_epi32(this->mValues, other.mValues);
-      return *this;
-    }
-  };
-
-  static_assert(sizeof(PathCounter) == 64, "Size of PathCounter is not valid!");
-
+  static const std::size_t width = (sizeof(SIZE) << 3);
   std::array<std::vector<Label>, 2> labels;
-  std::array<std::vector<uint8_t>, 2> lookup;
+
   std::vector<uint8_t> alreadyProcessed;
   std::array<const Graph *, 2> graph;
+
+  std::array<std::vector<uint8_t>, 2> lookup;
   std::array<bfs::BFS, 2> bfs;
 
-  std::array<std::vector<PathCounter>, 2> counter;
+  std::array<std::vector<SIZE>, 2> reached;
   std::vector<std::size_t> topoRank;
   std::vector<Edge> topoEdges;
 
   RXL(const Graph &fwdGraph, const Graph &bwdGraph)
       : labels{std::vector<Label>(), std::vector<Label>()},
-        lookup{std::vector<uint8_t>(), std::vector<uint8_t>()},
         alreadyProcessed(),
         graph{&fwdGraph, &bwdGraph},
+        lookup{std::vector<uint8_t>(), std::vector<uint8_t>()},
         bfs{bfs::BFS(fwdGraph), bfs::BFS(bwdGraph)},
-        counter{std::vector<PathCounter>(), std::vector<PathCounter>()},
+        reached{std::vector<SIZE>(), std::vector<SIZE>()},
         topoEdges() {
     init(fwdGraph.numVertices());
   };
 
-  void run(const std::string &orderingFileName, const int numThreads = 1) {
+  void runPrunedBFS(const Vertex v) {
+    assert(v < labels[BWD].size());
+
+    /* SIZE mask = (static_cast<SIZE>(1) << threadId) - 1; */
+
+    modifyLookups(v, true);
+
+    auto runOneDirection = [&](const DIRECTION dir) -> void {
+      bfs[dir].run(v, bfs::noOp, [&](const Vertex w) {
+        return alreadyProcessed[w] ||
+               std::any_of(labels[!dir][w].nodes.begin(),
+                           labels[!dir][w].nodes.end(),
+                           [&](const Vertex h) { return lookup[dir][h]; });
+        /* return alreadyProcessed[w] || (mask & reached[dir][w]) || */
+        /*        std::any_of( */
+        /*            labels[!dir][w].nodes.begin(),
+         * labels[!dir][w].nodes.end(), */
+        /*            [&](const Vertex h) { return lookup[dir][h]; }); */
+      });
+    };
+
+    runOneDirection(FWD);
+    bfs[FWD].doForAllVerticesInQ([&](const Vertex u) {
+      assert(!labels[!FWD][u].contains(v));
+      labels[!FWD][u].add(v);
+    });
+
+    runOneDirection(BWD);
+    bfs[BWD].doForAllVerticesInQ([&](const Vertex u) {
+      assert(!labels[!BWD][u].contains(v));
+      labels[!BWD][u].add(v);
+    });
+
+    alreadyProcessed[v] = true;
+    modifyLookups(v, false);
+  }
+
+  void run(const std::string &orderingFileName) {
     StatusLog log("Computing HLs");
     assert(graph[FWD]->numVertices() == graph[BWD]->numVertices());
     assert(graph[FWD]->numEdges() == graph[BWD]->numEdges());
-
-    omp_set_num_threads(numThreads);
 
     const std::size_t numVertices = graph[FWD]->numVertices();
 
@@ -87,7 +105,9 @@ struct RXL {
     assert(ordering.size() == numVertices);
     assert(isOrdering(ordering, numVertices));
 
-    for (std::size_t i = 0; i < numVertices; ++i) {
+    std::size_t i = 0;
+
+    for (; i < numVertices; ++i) {
       runPrunedBFS(ordering[i]);
     }
   }
@@ -156,7 +176,7 @@ struct RXL {
     ordering.reserve(graph[FWD]->numVertices());
 
     if (fileName == "") {
-      ordering.assign(graph[FWD]->numVertices(), 0);
+      parallel_assign(ordering, graph[FWD]->numVertices(), Vertex(0));
 
       std::iota(ordering.begin(), ordering.end(), 0);
       std::sort(ordering.begin(), ordering.end(),
@@ -236,21 +256,21 @@ struct RXL {
   };
 
   void init(std::size_t numVertices) {
-    labels[BWD].assign(numVertices, Label());
-    labels[FWD].assign(numVertices, Label());
+    parallel_assign(labels[BWD], numVertices, Label());
+    parallel_assign(labels[FWD], numVertices, Label());
+    parallel_assign(alreadyProcessed, numVertices, uint8_t(0));
 
-    lookup[BWD].assign(numVertices, false);
-    lookup[FWD].assign(numVertices, false);
-
-    alreadyProcessed.assign(numVertices, false);
+    parallel_assign(lookup[BWD], numVertices, uint8_t(0));
+    parallel_assign(lookup[FWD], numVertices, uint8_t(0));
 
     bfs[FWD].reset(numVertices);
     bfs[BWD].reset(numVertices);
 
-    counter[FWD].assign(numVertices, PathCounter(0));
-    counter[BWD].assign(numVertices, PathCounter(0));
+    parallel_assign(reached[BWD], numVertices, SIZE(0));
+    parallel_assign(reached[FWD], numVertices, SIZE(0));
 
-    topoRank.assign(numVertices, 0);
+    parallel_assign(topoRank, numVertices, std::size_t(0));
+
     TopologicalSort topoSort(*graph[FWD]);
     for (std::size_t i = 0; i < topoSort.ordering.size(); ++i) {
       topoRank[topoSort.ordering[i]] = i;
@@ -266,38 +286,6 @@ struct RXL {
     }
 
     std::sort(topoEdges.begin(), topoEdges.end());
-  }
-
-  void runPrunedBFS(const Vertex v) {
-    assert(v < labels[BWD].size());
-
-    auto prune = [&](const auto &labels, const auto &lookup) -> bool {
-      return std::any_of(labels.begin(), labels.end(),
-                         [&](const Vertex h) { return lookup[h]; });
-    };
-
-    modifyLookups(v, true);
-
-    auto runOneDirection = [&](const DIRECTION dir) -> void {
-      bfs[dir].run(v, bfs::noOp, [&](const Vertex w) {
-        return alreadyProcessed[w] || prune(labels[!dir][w].nodes, lookup[dir]);
-      });
-    };
-
-    runOneDirection(FWD);
-    bfs[FWD].doForAllVerticesInQ([&](const Vertex u) {
-      assert(!labels[!FWD][u].contains(v));
-      labels[!FWD][u].add(v);
-    });
-
-    runOneDirection(BWD);
-    bfs[BWD].doForAllVerticesInQ([&](const Vertex u) {
-      assert(!labels[!BWD][u].contains(v));
-      labels[!BWD][u].add(v);
-    });
-
-    alreadyProcessed[v] = true;
-    modifyLookups(v, false);
   }
 
   void modifyLookups(const Vertex v, bool value) {
@@ -316,15 +304,28 @@ struct RXL {
     forDir(BWD);
   }
 
-  std::vector<Vertex> sampleKVertices() {
-    std::random_device rd;
-    std::mt19937 g(rd());
+  void runReachabilitySweep(const std::size_t n,
+                            const std::vector<Vertex> &ordering) {
+    parallel_fill(reached[0], 0);
+    parallel_fill(reached[1], 0);
+    /* std::fill(reached[0].begin(), reached[0].end(), 0); */
+    /* std::fill(reached[1].begin(), reached[1].end(), 0); */
 
-    std::vector<Vertex> sample(graph[FWD]->numVertices(), 0);
-    std::iota(sample.begin(), sample.end(), 0);
+#pragma GCC unroll(4)
+    for (std::size_t j = 0; j < width; ++j) {
+      reached[0][ordering[n + j]] |= (1 << j);
+      reached[1][ordering[n + j]] |= (1 << j);
+    }
 
-    std::shuffle(sample.begin(), sample.end(), g);
-    sample.resize(std::min(static_cast<std::size_t>(K), sample.size()));
-    return sample;
+    for (std::size_t i = 0; i < topoEdges.size(); ++i) {
+      const auto &edge = topoEdges[i];
+
+      reached[0][edge.to] |= reached[0][edge.from];
+    }
+    for (std::size_t i = topoEdges.size(); i > 0; --i) {
+      const auto &edge = topoEdges[i - 1];
+
+      reached[0][edge.from] |= reached[0][edge.to];
+    }
   }
 };
