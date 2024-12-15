@@ -1,4 +1,7 @@
 #pragma once
+
+#include <omp.h>
+
 #include "../external/statistics_collecter.h"
 #include "bfs_tools.h"
 #include "graph.h"
@@ -47,6 +50,16 @@ struct BFS {
 
   template <typename FUNC>
   void doForAllVerticesInQ(FUNC &&func) {
+    for (std::size_t i = 0; i < q.read; ++i) {
+      const Vertex u = q.data[i];
+      func(u);
+    }
+  }
+
+  // make sure you do thread safe stuff in the function
+  template <typename FUNC>
+  void doForAllVerticesInQInParallel(FUNC &&func) {
+#pragma omp parallel for schedule(dynamic, 32)
     for (std::size_t i = 0; i < q.read; ++i) {
       const Vertex u = q.data[i];
       func(u);

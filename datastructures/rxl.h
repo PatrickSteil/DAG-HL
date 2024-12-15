@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <array>
+#include <bitset>
 #include <cassert>
 #include <cmath>
 #include <concepts>
@@ -29,10 +30,9 @@
 #include "topological_sort.h"
 #include "utils.h"
 
-template <std::integral SIZE = uint64_t>
+template <std::uint16_t SIZE = 64>
 struct RXL {
  public:
-  static const std::size_t width = (sizeof(SIZE) << 3);
   std::array<std::vector<Label>, 2> labels;
 
   std::vector<uint8_t> alreadyProcessed;
@@ -41,7 +41,7 @@ struct RXL {
   std::array<std::vector<uint8_t>, 2> lookup;
   std::array<bfs::BFS, 2> bfs;
 
-  std::array<std::vector<SIZE>, 2> reached;
+  /* std::array<std::vector<std::bitset<SIZE>>, 2> reached; */
   std::vector<std::size_t> topoRank;
   std::vector<Edge> topoEdges;
 
@@ -51,8 +51,9 @@ struct RXL {
         graph{&fwdGraph, &bwdGraph},
         lookup{std::vector<uint8_t>(), std::vector<uint8_t>()},
         bfs{bfs::BFS(fwdGraph), bfs::BFS(bwdGraph)},
-        reached{std::vector<SIZE>(), std::vector<SIZE>()},
         topoEdges() {
+    /* reached{std::vector<std::bitset<SIZE>>(),
+     * std::vector<std::bitset<SIZE>>()}, topoEdges() { */
     init(fwdGraph.numVertices());
   };
 
@@ -77,17 +78,30 @@ struct RXL {
       });
     };
 
-    runOneDirection(FWD);
-    bfs[FWD].doForAllVerticesInQ([&](const Vertex u) {
-      assert(!labels[!FWD][u].contains(v));
-      labels[!FWD][u].add(v);
-    });
+#pragma omp parallel for num_threads(2)
+    for (auto dir : {FWD, BWD}) {
+      runOneDirection(dir);
+    }
 
-    runOneDirection(BWD);
-    bfs[BWD].doForAllVerticesInQ([&](const Vertex u) {
-      assert(!labels[!BWD][u].contains(v));
-      labels[!BWD][u].add(v);
-    });
+#pragma omp parallel for num_threads(2)
+    for (auto dir : {FWD, BWD}) {
+      bfs[dir].doForAllVerticesInQ([&](const Vertex u) {
+        assert(!labels[!dir][u].contains(v));
+        labels[!dir][u].add(v);
+      });
+    }
+
+    /*     runOneDirection(FWD); */
+    /*     bfs[FWD].doForAllVerticesInQ([&](const Vertex u) { */
+    /*       assert(!labels[!FWD][u].contains(v)); */
+    /*       labels[!FWD][u].add(v); */
+    /*     }); */
+
+    /*     runOneDirection(BWD); */
+    /*     bfs[BWD].doForAllVerticesInQ([&](const Vertex u) { */
+    /*       assert(!labels[!BWD][u].contains(v)); */
+    /*       labels[!BWD][u].add(v); */
+    /*     }); */
 
     alreadyProcessed[v] = true;
     modifyLookups(v, false);
@@ -266,8 +280,8 @@ struct RXL {
     bfs[FWD].reset(numVertices);
     bfs[BWD].reset(numVertices);
 
-    parallel_assign(reached[BWD], numVertices, SIZE(0));
-    parallel_assign(reached[FWD], numVertices, SIZE(0));
+    /* parallel_assign(reached[BWD], numVertices, SIZE(0)); */
+    /* parallel_assign(reached[FWD], numVertices, SIZE(0)); */
 
     parallel_assign(topoRank, numVertices, std::size_t(0));
 
@@ -304,28 +318,26 @@ struct RXL {
     forDir(BWD);
   }
 
-  void runReachabilitySweep(const std::size_t n,
-                            const std::vector<Vertex> &ordering) {
-    parallel_fill(reached[0], 0);
-    parallel_fill(reached[1], 0);
-    /* std::fill(reached[0].begin(), reached[0].end(), 0); */
-    /* std::fill(reached[1].begin(), reached[1].end(), 0); */
+  /*   void runReachabilitySweep(const std::size_t n, */
+  /*                             const std::vector<Vertex> &ordering) { */
+  /*     parallel_fill(reached[0], 0); */
+  /*     parallel_fill(reached[1], 0); */
 
-#pragma GCC unroll(4)
-    for (std::size_t j = 0; j < width; ++j) {
-      reached[0][ordering[n + j]] |= (1 << j);
-      reached[1][ordering[n + j]] |= (1 << j);
-    }
+  /* #pragma GCC unroll(4) */
+  /*     for (std::size_t j = 0; j < width; ++j) { */
+  /*       reached[0][ordering[n + j]] |= (1 << j); */
+  /*       reached[1][ordering[n + j]] |= (1 << j); */
+  /*     } */
 
-    for (std::size_t i = 0; i < topoEdges.size(); ++i) {
-      const auto &edge = topoEdges[i];
+  /*     for (std::size_t i = 0; i < topoEdges.size(); ++i) { */
+  /*       const auto &edge = topoEdges[i]; */
 
-      reached[0][edge.to] |= reached[0][edge.from];
-    }
-    for (std::size_t i = topoEdges.size(); i > 0; --i) {
-      const auto &edge = topoEdges[i - 1];
+  /*       reached[0][edge.to] |= reached[0][edge.from]; */
+  /*     } */
+  /*     for (std::size_t i = topoEdges.size(); i > 0; --i) { */
+  /*       const auto &edge = topoEdges[i - 1]; */
 
-      reached[0][edge.from] |= reached[0][edge.to];
-    }
-  }
+  /*       reached[0][edge.from] |= reached[0][edge.to]; */
+  /*     } */
+  /*   } */
 };

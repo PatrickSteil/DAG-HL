@@ -53,6 +53,7 @@ The file contains the labels for all vertices in the graph. Each vertex contribu
 For a graph with the following labels:
 -   Vertex 0: Outgoing: [1, 3], Incoming: [2, 4]
 -   Vertex 1: Outgoing: [2], Incoming: [0, 3]
+
 The output file will be:
 ```
 o 1 3
@@ -96,3 +97,7 @@ Total memory consumption [megabytes]:
   117.881
 The 10000 random queries took in total 200523 [ms] and on average 20.0523 [ns]!
 ```
+
+## Reference
+
+Based on "Fast Exact Shortest-Path Distance Queries on Large Networks by Pruned Landmark Labeling" by Akiba et al [ArXiv](https://arxiv.org/pdf/1304.4661).
