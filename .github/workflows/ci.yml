@@ -1,0 +1,38 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+        with:
+          submodules: true 
+
+      - name: Git Submodule Update
+        run: |
+          git submodule update --init --recursive
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake libgtest-dev libbenchmark-dev libtbb-dev
+
+      - name: Install Google Test
+        run: |
+          cd /usr/src/googletest
+          sudo cmake .
+          sudo make
+          sudo cp lib/libgtest*.a /usr/lib/
+
+      - name: Build
+        run: |
+          ./build.sh
+
+      - name: Run tests
+        run: |
+          cd build-debug
+          ./unit_test
