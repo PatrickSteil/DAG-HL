@@ -49,7 +49,7 @@ add_executable(unit_test
 target_include_directories(unit_test PUBLIC datastructures)
 
 find_package(GTest REQUIRED)
-target_link_libraries(unit_test PRIVATE GTest::gtest_main GTest::gmock_main)
+target_link_libraries(unit_test PRIVATE GTest::gtest_main)
 
 if(OpenMP_CXX_FOUND)
     target_link_libraries(unit_test PUBLIC OpenMP::OpenMP_CXX)
