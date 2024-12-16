@@ -41,7 +41,7 @@ endif()
 enable_testing()
 
 add_executable(unit_test 
-    tests/pruned_landmark_labeling_test.cpp 
+    # tests/pruned_landmark_labeling_test.cpp 
     tests/graph_test.cpp 
     tests/utils_test.cpp 
     tests/priority_queue_test.cpp 

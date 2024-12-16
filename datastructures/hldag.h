@@ -21,17 +21,19 @@
 #include <limits>
 #include <random>
 #include <set>
+#include <stdexcept>
 #include <vector>
 
 #include "bfs.h"
 #include "graph.h"
 #include "hub_labels.h"
+#include "pruned_landmark_labeling.h"
 #include "status_log.h"
 #include "topological_sort.h"
 #include "utils.h"
 
 template <std::uint16_t SIZE = 64>
-struct RXL {
+struct HLDAG {
  public:
   std::array<std::vector<Label>, 2> labels;
 
@@ -41,71 +43,30 @@ struct RXL {
   std::array<std::vector<uint8_t>, 2> lookup;
   std::array<bfs::BFS, 2> bfs;
 
-  /* std::array<std::vector<std::bitset<SIZE>>, 2> reached; */
   std::vector<std::size_t> topoRank;
   std::vector<Edge> topoEdges;
 
-  RXL(const Graph &fwdGraph, const Graph &bwdGraph)
+  std::vector<PLL> workers;
+
+  HLDAG(const Graph &fwdGraph, const Graph &bwdGraph,
+        const int numberOfThreads = 1)
       : labels{std::vector<Label>(), std::vector<Label>()},
         alreadyProcessed(),
         graph{&fwdGraph, &bwdGraph},
         lookup{std::vector<uint8_t>(), std::vector<uint8_t>()},
         bfs{bfs::BFS(fwdGraph), bfs::BFS(bwdGraph)},
-        topoEdges() {
-    /* reached{std::vector<std::bitset<SIZE>>(),
-     * std::vector<std::bitset<SIZE>>()}, topoEdges() { */
+        topoEdges(),
+        workers() {
+    if (numberOfThreads < 1) {
+      throw std::runtime_error(
+          "Number of threads should not be smaller than 1!");
+    }
+    workers.reserve(numberOfThreads);
+    for (int t = 0; t < numberOfThreads; ++t) {
+      workers.emplace_back(labels, lookup, alreadyProcessed, graph);
+    }
     init(fwdGraph.numVertices());
   };
-
-  void runPrunedBFS(const Vertex v) {
-    assert(v < labels[BWD].size());
-
-    /* SIZE mask = (static_cast<SIZE>(1) << threadId) - 1; */
-
-    modifyLookups(v, true);
-
-    auto runOneDirection = [&](const DIRECTION dir) -> void {
-      bfs[dir].run(v, bfs::noOp, [&](const Vertex w) {
-        return alreadyProcessed[w] ||
-               std::any_of(labels[!dir][w].nodes.begin(),
-                           labels[!dir][w].nodes.end(),
-                           [&](const Vertex h) { return lookup[dir][h]; });
-        /* return alreadyProcessed[w] || (mask & reached[dir][w]) || */
-        /*        std::any_of( */
-        /*            labels[!dir][w].nodes.begin(),
-         * labels[!dir][w].nodes.end(), */
-        /*            [&](const Vertex h) { return lookup[dir][h]; }); */
-      });
-    };
-
-#pragma omp parallel for num_threads(2)
-    for (auto dir : {FWD, BWD}) {
-      runOneDirection(dir);
-    }
-
-#pragma omp parallel for num_threads(2)
-    for (auto dir : {FWD, BWD}) {
-      bfs[dir].doForAllVerticesInQ([&](const Vertex u) {
-        assert(!labels[!dir][u].contains(v));
-        labels[!dir][u].add(v);
-      });
-    }
-
-    /*     runOneDirection(FWD); */
-    /*     bfs[FWD].doForAllVerticesInQ([&](const Vertex u) { */
-    /*       assert(!labels[!FWD][u].contains(v)); */
-    /*       labels[!FWD][u].add(v); */
-    /*     }); */
-
-    /*     runOneDirection(BWD); */
-    /*     bfs[BWD].doForAllVerticesInQ([&](const Vertex u) { */
-    /*       assert(!labels[!BWD][u].contains(v)); */
-    /*       labels[!BWD][u].add(v); */
-    /*     }); */
-
-    alreadyProcessed[v] = true;
-    modifyLookups(v, false);
-  }
 
   void run(const std::string &orderingFileName) {
     StatusLog log("Computing HLs");
@@ -122,7 +83,7 @@ struct RXL {
     std::size_t i = 0;
 
     for (; i < numVertices; ++i) {
-      runPrunedBFS(ordering[i]);
+      workers[0].runPrunedBFS(ordering[i]);
     }
   }
 

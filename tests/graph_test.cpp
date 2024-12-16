@@ -145,12 +145,9 @@ TEST_F(GraphTest, TopologicalSortValidDAG) {
 
   TopologicalSort topoSort(graph);
 
-  // Validate topological order
   const std::vector<Vertex> &order = topoSort.ordering;
   EXPECT_EQ(order.size(), graph.numVertices());
 
-  // Verify the topological property: for every edge u -> v, u appears before v
-  // in the ordering
   std::vector<std::size_t> position(graph.numVertices());
   for (std::size_t i = 0; i < order.size(); ++i) {
     position[order[i]] = i;

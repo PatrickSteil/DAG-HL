@@ -25,37 +25,21 @@
 
 struct PLL {
  public:
-  /* enum DIRECTION : bool { FWD, BWD }; */
-  /* struct alignas(64) Label { */
-  /*   Label(){}; */
-
-  /*   std::vector<Vertex> nodes; */
-
-  /*   Vertex &operator[](std::size_t i) { return nodes[i]; } */
-  /*   const Vertex &operator[](std::size_t i) const { return nodes[i]; } */
-
-  /*   void reserve(const std::size_t size) { nodes.reserve(size); }; */
-  /*   std::size_t size() const { return nodes.size(); }; */
-  /*   void add(const Vertex hub) { nodes.push_back(hub); }; */
-  /*   bool contains(const Vertex hub) { */
-  /*     return std::find(nodes.begin(), nodes.end(), hub) != nodes.end(); */
-  /*   }; */
-  /* }; */
-
-  std::array<std::vector<Label>, 2> labels;
-  std::array<std::vector<uint8_t>, 2> lookup;
-  std::vector<uint8_t> alreadyProcessed;
-  std::array<const Graph *, 2> graph;
+  std::array<std::vector<Label>, 2> &labels;
+  std::array<std::vector<uint8_t>, 2> &lookup;
+  std::vector<uint8_t> &alreadyProcessed;
+  std::array<const Graph *, 2> &graph;
   std::array<bfs::BFS, 2> bfs;
 
-  PLL(const Graph &fwdGraph, const Graph &bwdGraph)
-      : labels{std::vector<Label>(fwdGraph.numVertices()),
-               std::vector<Label>(fwdGraph.numVertices())},
-        lookup{std::vector<uint8_t>(fwdGraph.numVertices(), false),
-               std::vector<uint8_t>(fwdGraph.numVertices(), false)},
-        alreadyProcessed(fwdGraph.numVertices(), false),
-        graph{&fwdGraph, &bwdGraph},
-        bfs{bfs::BFS(fwdGraph), bfs::BFS(bwdGraph)} {};
+  PLL(std::array<std::vector<Label>, 2> &labels,
+      std::array<std::vector<uint8_t>, 2> &lookup,
+      std::vector<uint8_t> &alreadyProcessed,
+      std::array<const Graph *, 2> &graph)
+      : labels(labels),
+        lookup(lookup),
+        alreadyProcessed(alreadyProcessed),
+        graph(graph),
+        bfs{bfs::BFS(*graph[FWD]), bfs::BFS(*graph[BWD])} {};
 
   void run(const std::vector<Vertex> &ordering) {
     StatusLog log("Computing HLs");
@@ -71,93 +55,6 @@ struct PLL {
     }
   }
 
-  void showStats() const {
-    auto computeStats = [](const std::vector<Label> &currentLabels) {
-      std::size_t minSize = std::numeric_limits<std::size_t>::max();
-      std::size_t maxSize = 0;
-      std::size_t totalSize = 0;
-
-      for (const auto &label : currentLabels) {
-        std::size_t size = label.size();
-        minSize = std::min(minSize, size);
-        maxSize = std::max(maxSize, size);
-        totalSize += size;
-      }
-
-      double avgSize = static_cast<double>(totalSize) / currentLabels.size();
-      return std::make_tuple(minSize, maxSize, avgSize);
-    };
-
-    auto [inMin, inMax, inAvg] = computeStats(labels[BWD]);
-    auto [outMin, outMax, outAvg] = computeStats(labels[FWD]);
-
-    std::cout << "Forward Labels Statistics:" << std::endl;
-    std::cout << "  Min Size: " << outMin << std::endl;
-    std::cout << "  Max Size: " << outMax << std::endl;
-    std::cout << "  Avg Size: " << outAvg << std::endl;
-
-    std::cout << "Backward Labels Statistics:" << std::endl;
-    std::cout << "  Min Size: " << inMin << std::endl;
-    std::cout << "  Max Size: " << inMax << std::endl;
-    std::cout << "  Avg Size: " << inAvg << std::endl;
-  }
-
-  void print() const {
-    for (std::size_t v = 0; v < graph[FWD]->numVertices(); ++v) {
-      std::cout << " -> " << v << "\n\t";
-      for (auto h : labels[FWD][v].nodes) std::cout << h << " ";
-      std::cout << "\n <- " << v << "\n\t";
-      for (auto h : labels[BWD][v].nodes) std::cout << h << " ";
-      std::cout << std::endl;
-    }
-  }
-
-  void sortAllLabels() {
-    StatusLog log("Sort all labels");
-    // split for cache locality
-#pragma omp parallel for schedule(dynamic, 64)
-    for (std::size_t i = 0; i < labels[FWD].size(); ++i) {
-      std::sort(labels[FWD][i].nodes.begin(), labels[FWD][i].nodes.end());
-    }
-
-#pragma omp parallel for schedule(dynamic, 64)
-    for (std::size_t i = 0; i < labels[BWD].size(); ++i) {
-      std::sort(labels[BWD][i].nodes.begin(), labels[BWD][i].nodes.end());
-    }
-  }
-
-  void saveToFile(const std::string &fileName) {
-    std::ofstream outFile(fileName);
-
-    if (!outFile.is_open()) {
-      std::cerr << "Error: Unable to open file " << fileName
-                << " for writing.\n";
-      return;
-    }
-
-    for (std::size_t v = 0; v < graph[FWD]->numVertices(); ++v) {
-      outFile << "o";
-      for (const Vertex hub : labels[FWD][v].nodes) {
-        outFile << " " << hub;
-      }
-      outFile << "\n";
-
-      outFile << "i";
-      for (const Vertex hub : labels[BWD][v].nodes) {
-        outFile << " " << hub;
-      }
-      outFile << "\n";
-    }
-
-    outFile.close();
-    if (outFile.fail()) {
-      std::cerr << "Error: Writing to file " << fileName << " failed.\n";
-    } else {
-      std::cout << "Labels saved successfully to " << fileName << "\n";
-    }
-  }
-
- private:
   void init(std::size_t numVertices) {
     labels[BWD].assign(numVertices, Label());
     labels[FWD].assign(numVertices, Label());
@@ -174,29 +71,48 @@ struct PLL {
   void runPrunedBFS(const Vertex v) {
     assert(v < labels[BWD].size());
 
-    auto prune = [&](const auto &labels, const auto &lookup) -> bool {
-      return std::any_of(labels.begin(), labels.end(),
-                         [&](const Vertex h) { return lookup[h]; });
-    };
+    /* SIZE mask = (static_cast<SIZE>(1) << threadId) - 1; */
 
     modifyLookups(v, true);
 
-    auto noOp = [](const Vertex /* v */) { return false; };
-
     auto runOneDirection = [&](const DIRECTION dir) -> void {
-      bfs[dir].run(v, noOp, [&](const Vertex w) {
-        return alreadyProcessed[w] || prune(labels[!dir][w].nodes, lookup[dir]);
+      bfs[dir].run(v, bfs::noOp, [&](const Vertex w) {
+        return alreadyProcessed[w] ||
+               std::any_of(labels[!dir][w].nodes.begin(),
+                           labels[!dir][w].nodes.end(),
+                           [&](const Vertex h) { return lookup[dir][h]; });
+        /* return alreadyProcessed[w] || (mask & reached[dir][w]) || */
+        /*        std::any_of( */
+        /*            labels[!dir][w].nodes.begin(),
+         * labels[!dir][w].nodes.end(), */
+        /*            [&](const Vertex h) { return lookup[dir][h]; }); */
       });
     };
 
 #pragma omp parallel for num_threads(2)
-    for (const auto direction : {FWD, BWD}) {
-      runOneDirection(direction);
-      bfs[direction].doForAllVerticesInQ([&](const Vertex u) {
-        assert(!labels[!direction][u].contains(v));
-        labels[!direction][u].add(v);
+    for (auto dir : {FWD, BWD}) {
+      runOneDirection(dir);
+    }
+
+#pragma omp parallel for num_threads(2)
+    for (auto dir : {FWD, BWD}) {
+      bfs[dir].doForAllVerticesInQ([&](const Vertex u) {
+        assert(!labels[!dir][u].contains(v));
+        labels[!dir][u].add(v);
       });
     }
+
+    /*     runOneDirection(FWD); */
+    /*     bfs[FWD].doForAllVerticesInQ([&](const Vertex u) { */
+    /*       assert(!labels[!FWD][u].contains(v)); */
+    /*       labels[!FWD][u].add(v); */
+    /*     }); */
+
+    /*     runOneDirection(BWD); */
+    /*     bfs[BWD].doForAllVerticesInQ([&](const Vertex u) { */
+    /*       assert(!labels[!BWD][u].contains(v)); */
+    /*       labels[!BWD][u].add(v); */
+    /*     }); */
 
     alreadyProcessed[v] = true;
     modifyLookups(v, false);
@@ -214,9 +130,7 @@ struct PLL {
       }
     };
 
-#pragma omp parallel for num_threads(2)
-    for (const auto direction : {FWD, BWD}) {
-      forDir(direction);
-    }
+    forDir(FWD);
+    forDir(BWD);
   }
 };

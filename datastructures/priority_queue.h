@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <concepts>
 #include <cstdint>
 #include <iostream>
 #include <utility>
@@ -9,27 +10,30 @@
 
 #include "types.h"
 
-template <typename Comparator = std::less<uint32_t>>
+template <typename Comparator = std::less<uint32_t>,
+          std::integral IndexInt = std::uint32_t>
 class PriorityQueue {
  private:
   using HeapElement = std::pair<uint32_t, Vertex>;
+  const IndexInt noIndexInt = static_cast<IndexInt>(-1);
+
   std::vector<HeapElement> heap;
-  std::vector<Index> mapper;
+  std::vector<IndexInt> mapper;
   Comparator comp;
 
  public:
-  PriorityQueue(size_t size = 0) : heap(), mapper(size, noIndex), comp() {}
+  PriorityQueue(size_t size = 0) : heap(), mapper(size, noIndexInt), comp() {}
 
-  inline size_t size() const { return heap.size(); }
-  inline bool empty() const { return heap.empty(); }
-  inline size_t capacity() const { return mapper.size(); }
+  size_t size() const { return heap.size(); }
+  bool empty() const { return heap.empty(); }
+  size_t capacity() const { return mapper.size(); }
 
-  inline bool isValid(Index i) const { return i < mapper.size(); }
+  bool isValid(IndexInt i) const { return i < mapper.size(); }
 
-  inline bool heapPropertyFullfilled() const {
-    for (Index i = 0; i < size(); ++i) {
-      Index left = getLeftChild(i);
-      Index right = getRightChild(i);
+  bool heapPropertyFullfilled() const {
+    for (IndexInt i = 0; i < size(); ++i) {
+      IndexInt left = getLeftChild(i);
+      IndexInt right = getRightChild(i);
 
       if (left < size() && comp(heap[left].first, heap[i].first)) {
         std::cerr << "[FAIL] Heap Property violated from " << int(i) << " to "
@@ -47,25 +51,25 @@ class PriorityQueue {
     return true;
   }
 
-  inline uint32_t get(Vertex v) const {
-    if (mapper[v] == noIndex) return uint32_t(-1);
+  uint32_t get(Vertex v) const {
+    if (mapper[v] == noIndexInt) return uint32_t(-1);
     return heap[mapper[v]].first;
   }
 
-  inline Index getLeftChild(Index i) const { return (i * 2) + 1; }
+  IndexInt getLeftChild(IndexInt i) const { return (i * 2) + 1; }
 
-  inline Index getRightChild(Index i) const { return (i * 2) + 2; }
+  IndexInt getRightChild(IndexInt i) const { return (i * 2) + 2; }
 
-  inline Index getParentIndex(Index i) const { return (i - 1) / 2; }
+  IndexInt getParentIndex(IndexInt i) const { return (i - 1) / 2; }
 
-  inline void swap(Index i, Index j) {
+  void swap(IndexInt i, IndexInt j) {
     assert(isValid(i) && isValid(j));
     mapper[heap[i].second] = j;
     mapper[heap[j].second] = i;
     std::swap(heap[i], heap[j]);
   }
 
-  inline void siftDown(Index i) {
+  void siftDown(IndexInt i) {
     assert(isValid(i));
     while (true) {
       auto left = getLeftChild(i);
@@ -85,10 +89,10 @@ class PriorityQueue {
     }
   }
 
-  inline void siftUp(Index i) {
+  void siftUp(IndexInt i) {
     assert(isValid(i));
     while (i > 0) {
-      Index parent = getParentIndex(i);
+      IndexInt parent = getParentIndex(i);
       if (comp(heap[i].first, heap[parent].first)) {
         swap(i, parent);
         i = parent;
@@ -100,15 +104,15 @@ class PriorityQueue {
 
   void push(Vertex v, uint32_t value) {
     if (v >= mapper.size()) {
-      mapper.resize(v + 1, noIndex);
+      mapper.resize(v + 1, noIndexInt);
     }
 
-    if (mapper[v] == noIndex) {
+    if (mapper[v] == noIndexInt) {
       heap.emplace_back(value, v);
       mapper[v] = size() - 1;
       siftUp(size() - 1);
     } else {
-      Index i = mapper[v];
+      IndexInt i = mapper[v];
       if (heap[i].first == value) {
         return;
       }
@@ -131,7 +135,7 @@ class PriorityQueue {
     auto result = heap[0];
     swap(0, size() - 1);
     heap.pop_back();
-    mapper[result.second] = noIndex;
+    mapper[result.second] = noIndexInt;
 
     if (!empty()) {
       siftDown(0);
@@ -163,7 +167,7 @@ class PriorityQueue {
     assert(heapPropertyFullfilled());
   }
 
-  void buildHeapRecursive(Index i) {
+  void buildHeapRecursive(IndexInt i) {
     if (2 * i + 1 < size()) {
       buildHeapRecursive(getLeftChild(i));
     }
@@ -175,7 +179,7 @@ class PriorityQueue {
   }
 
   void reset() {
-    std::fill(mapper.begin(), mapper.end(), noIndex);
+    std::fill(mapper.begin(), mapper.end(), noIndexInt);
     heap.clear();
     heap.reserve(capacity());
   }

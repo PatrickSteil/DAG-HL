@@ -1,15 +1,14 @@
 #include <stdlib.h>
 
-#include <chrono>
 #include <cstdlib>
 #include <iostream>
 #include <numeric>
-#include <set>
 #include <thread>
 #include <utility>
 
 #include "datastructures/graph.h"
-#include "datastructures/rxl.h"
+#include "datastructures/hldag.h"
+#include "datastructures/hub_labels.h"
 #include "external/cmdparser.hpp"
 
 void configure_parser(cli::Parser &parser) {
@@ -31,26 +30,6 @@ void configure_parser(cli::Parser &parser) {
                             "Runs a small (1000) query benchmark");
 };
 
-std::vector<std::pair<Vertex, Vertex>> generateRandomQueries(int numQueries,
-                                                             int minVertex,
-                                                             int maxVertex) {
-  std::vector<std::pair<Vertex, Vertex>> queries;
-  std::srand(42);
-
-  for (int i = 0; i < numQueries; ++i) {
-    Vertex source = minVertex + std::rand() % (maxVertex - minVertex + 1);
-    Vertex target = minVertex + std::rand() % (maxVertex - minVertex + 1);
-
-    while (source == target) {
-      target = minVertex + std::rand() % (maxVertex - minVertex + 1);
-    }
-
-    queries.emplace_back(source, target);
-  }
-
-  return queries;
-}
-
 int main(int argc, char *argv[]) {
   cli::Parser parser(argc, argv);
 
@@ -63,7 +42,7 @@ int main(int argc, char *argv[]) {
   const int numThreads = parser.get<int>("t");
   const auto showStats = parser.get<bool>("s");
   const auto compress = parser.get<bool>("c");
-  const auto benchmark = parser.get<bool>("b");
+  const auto run_benchmark = parser.get<bool>("b");
 
   if (numThreads <= 0) {
     std::cout << "Number of threads should be greater than 0!" << std::endl;
@@ -80,7 +59,7 @@ int main(int argc, char *argv[]) {
 
   Graph rev = g.reverseGraph();
 
-  RXL<> hl(g, rev);
+  HLDAG<> hl(g, rev);
 
   hl.run(orderingFile);
 
@@ -100,27 +79,8 @@ int main(int argc, char *argv[]) {
 
   if (outputFileName != "") saveToFile(hl.labels, outputFileName);
 
-  if (benchmark) {
-    using std::chrono::duration;
-    using std::chrono::duration_cast;
-    using std::chrono::high_resolution_clock;
-    using std::chrono::milliseconds;
-
-    std::size_t numQueries = 10000;
-
-    auto queries = generateRandomQueries(numQueries, 0, g.numVertices());
-    long double totalTime(0);
-    for (std::pair<Vertex, Vertex> paar : queries) {
-      auto t1 = high_resolution_clock::now();
-      query(hl.labels, paar.first, paar.second);
-      auto t2 = high_resolution_clock::now();
-      duration<double, std::nano> nano_double = t2 - t1;
-      totalTime += nano_double.count();
-    }
-
-    std::cout << "The " << numQueries << " random queries took in total "
-              << totalTime << " [ms] and on average "
-              << (double)(totalTime / numQueries) << " [ns]!\n";
+  if (run_benchmark) {
+    benchmark(hl.labels, 1000);
   }
   return 0;
 }

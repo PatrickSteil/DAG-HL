@@ -10,7 +10,9 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <fstream>
+#include <iostream>
 #include <numeric>
 #include <sstream>
 #include <vector>
@@ -18,6 +20,7 @@
 #include "priority_queue.h"
 #include "status_log.h"
 #include "types.h"
+#include "utils.h"
 
 enum DIRECTION : bool { FWD, BWD };
 
@@ -64,6 +67,8 @@ struct Label {
 
 bool query(std::array<std::vector<Label>, 2> &labels, const Vertex from,
            const Vertex to) {
+  if (from == to) [[unlikely]]
+    return true;
   std::size_t i = 0;
   std::size_t j = 0;
 
@@ -212,4 +217,29 @@ void sortLabels(std::array<std::vector<Label>, 2> &labels) {
   for (std::size_t i = 0; i < labels[BWD].size(); ++i) {
     std::sort(labels[BWD][i].nodes.begin(), labels[BWD][i].nodes.end());
   }
+}
+
+void benchmark(std::array<std::vector<Label>, 2> &labels,
+               const std::size_t numQueries) {
+  using std::chrono::duration;
+  using std::chrono::duration_cast;
+  using std::chrono::high_resolution_clock;
+  using std::chrono::milliseconds;
+
+  assert(labels[FWD].size() == labels[BWD].size());
+
+  auto queries =
+      generateRandomQueries<Vertex>(numQueries, 0, labels[FWD].size());
+  long double totalTime(0);
+  for (std::pair<Vertex, Vertex> paar : queries) {
+    auto t1 = high_resolution_clock::now();
+    query(labels, paar.first, paar.second);
+    auto t2 = high_resolution_clock::now();
+    duration<double, std::nano> nano_double = t2 - t1;
+    totalTime += nano_double.count();
+  }
+
+  std::cout << "The " << numQueries << " random queries took in total "
+            << totalTime << " [ms] and on average "
+            << (double)(totalTime / numQueries) << " [ns]!\n";
 }

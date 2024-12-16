@@ -61,11 +61,13 @@ struct Graph {
 
   std::size_t beginEdge(const Vertex v) const {
     assert(isValid(v));
+    assert(v < adjArray.size());
     return adjArray[v];
   }
 
   std::size_t endEdge(const Vertex v) const {
     assert(isValid(v));
+    assert(v + 1 < adjArray.size());
     return adjArray[v + 1];
   }
 
@@ -201,7 +203,7 @@ struct Graph {
       throw std::runtime_error("Invalid METIS file format: invalid header");
     }
 
-    adjArray.resize(numVertices + 1, 0);
+    adjArray.assign(numVertices + 1, 0);
     std::vector<std::vector<Vertex>> adjacencyLists(numVertices);
 
     Vertex vertexId = 0;
@@ -244,28 +246,42 @@ struct Graph {
 
   Graph reverseGraph() const {
     StatusLog log("Reversing Graph");
+
     Graph reversed;
-    reversed.adjArray.resize(numVertices() + 1, 0);
+    reversed.adjArray = adjArray;
+    reversed.toVertex = toVertex;
+    reversed.flip();
+    return reversed;
+  }
 
-    for (const Vertex v : toVertex) {
-      ++reversed.adjArray[v + 1];
-    }
+  void flip() {
+    std::vector<std::size_t> flippedAdjArray(numVertices() + 1, 0);
+    std::vector<Vertex> flippedToVertex(numEdges(), noVertex);
 
-    for (std::size_t i = 1; i < reversed.adjArray.size(); ++i) {
-      reversed.adjArray[i] += reversed.adjArray[i - 1];
-    }
-
-    reversed.toVertex.resize(numEdges());
-    std::vector<std::size_t> offset = reversed.adjArray;
-
-    for (Vertex u = 0; u < numVertices(); ++u) {
-      for (std::size_t i = beginEdge(u); i < endEdge(u); ++i) {
-        Vertex v = toVertex[i];
-        reversed.toVertex[offset[v]++] = u;
+    // Count in-degrees
+    for (Vertex fromV(0); fromV < numVertices(); ++fromV) {
+      for (std::size_t i = adjArray[fromV]; i < adjArray[fromV + 1]; ++i) {
+        flippedAdjArray[toVertex[i] + 1]++;
       }
     }
 
-    return reversed;
+    // Convert counts to prefix sums
+    for (Vertex v = 1; v <= numVertices(); ++v) {
+      flippedAdjArray[v] += flippedAdjArray[v - 1];
+    }
+
+    // Build the reversed graph
+    std::vector<std::size_t> offset = flippedAdjArray;
+
+    for (Vertex fromV(0); fromV < numVertices(); ++fromV) {
+      for (std::size_t i = adjArray[fromV]; i < adjArray[fromV + 1]; ++i) {
+        Vertex toV = toVertex[i];
+        flippedToVertex[offset[toV]++] = fromV;
+      }
+    }
+
+    adjArray = std::move(flippedAdjArray);
+    toVertex = std::move(flippedToVertex);
   }
 
   void showStats() const {
