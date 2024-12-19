@@ -1,7 +1,7 @@
 /*
  * Licensed under MIT License.
  * Author: Patrick Steil
-*/
+ */
 
 #pragma once
 
@@ -29,7 +29,7 @@
 #include "status_log.h"
 
 struct PLL {
-public:
+ public:
   std::array<std::vector<Label>, 2> &labels;
   std::array<std::vector<uint8_t>, 2> &lookup;
   std::vector<uint8_t> &alreadyProcessed;
@@ -40,8 +40,11 @@ public:
       std::array<std::vector<uint8_t>, 2> &lookup,
       std::vector<uint8_t> &alreadyProcessed,
       std::array<const Graph *, 2> &graph)
-      : labels(labels), lookup(lookup), alreadyProcessed(alreadyProcessed),
-        graph(graph), bfs{bfs::BFS(*graph[FWD]), bfs::BFS(*graph[BWD])} {};
+      : labels(labels),
+        lookup(lookup),
+        alreadyProcessed(alreadyProcessed),
+        graph(graph),
+        bfs{bfs::BFS(*graph[FWD]), bfs::BFS(*graph[BWD])} {};
 
   void run(const std::vector<Vertex> &ordering) {
     StatusLog log("Computing HLs");
@@ -91,12 +94,12 @@ public:
       });
     };
 
-#pragma omp parallel for num_threads(2)
+    /* #pragma omp parallel for */
     for (auto dir : {FWD, BWD}) {
       runOneDirection(dir);
     }
 
-#pragma omp parallel for num_threads(2)
+    /* #pragma omp parallel for */
     for (auto dir : {FWD, BWD}) {
       bfs[dir].doForAllVerticesInQ([&](const Vertex u) {
         assert(!labels[!dir][u].contains(v));

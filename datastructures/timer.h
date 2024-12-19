@@ -1,7 +1,7 @@
 /*
  * Licensed under MIT License.
  * Author: Patrick Steil
-*/
+ */
 
 #ifndef TIMER_H
 #define TIMER_H

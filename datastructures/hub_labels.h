@@ -1,7 +1,7 @@
 /*
  * Licensed under MIT License.
  * Author: Patrick Steil
-*/
+ */
 
 #pragma once
 
@@ -53,8 +53,7 @@ struct Label {
   }
 
   void setDeltaRepresentation() {
-    if (nodes.empty())
-      return;
+    if (nodes.empty()) return;
 
     std::vector<Vertex> new_nodes;
     new_nodes.reserve(nodes.size());
@@ -82,8 +81,7 @@ bool query(std::array<std::vector<Label>, 2> &labels, const Vertex from,
   const auto &toLabels = labels[BWD][to];
 
   while (i < fromLabels.size() && j < toLabels.size()) {
-    if (fromLabels[i] == toLabels[j])
-      return true;
+    if (fromLabels[i] == toLabels[j]) return true;
 
     if (fromLabels[i] < toLabels[j]) {
       i++;
@@ -214,8 +212,8 @@ void readFromFile(std::array<std::vector<Label>, 2> &labels,
   }
 }
 
-std::vector<Vertex>
-computePermutation(const std::array<std::vector<Label>, 2> &labels) {
+std::vector<Vertex> computePermutation(
+    const std::array<std::vector<Label>, 2> &labels) {
   StatusLog log("Compute Hub permutation");
   const std::size_t numVertices = labels[0].size();
   std::vector<Vertex> result;

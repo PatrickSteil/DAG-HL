@@ -1,7 +1,7 @@
 /*
  * Licensed under MIT License.
  * Author: Patrick Steil
-*/
+ */
 
 #ifndef STATUS_LOG_H
 #define STATUS_LOG_H

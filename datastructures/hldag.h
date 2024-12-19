@@ -1,7 +1,7 @@
 /*
  * Licensed under MIT License.
  * Author: Patrick Steil
-*/
+ */
 
 #pragma once
 
@@ -37,8 +37,9 @@
 #include "topological_sort.h"
 #include "utils.h"
 
-template <std::uint16_t SIZE = 64> struct HLDAG {
-public:
+template <std::uint16_t SIZE = 64>
+struct HLDAG {
+ public:
   std::array<std::vector<Label>, 2> labels;
 
   std::vector<uint8_t> alreadyProcessed;
@@ -54,10 +55,13 @@ public:
 
   HLDAG(const Graph &fwdGraph, const Graph &bwdGraph,
         const int numberOfThreads = 1)
-      : labels{std::vector<Label>(), std::vector<Label>()}, alreadyProcessed(),
+      : labels{std::vector<Label>(), std::vector<Label>()},
+        alreadyProcessed(),
         graph{&fwdGraph, &bwdGraph},
         lookup{std::vector<uint8_t>(), std::vector<uint8_t>()},
-        bfs{bfs::BFS(fwdGraph), bfs::BFS(bwdGraph)}, topoEdges(), workers() {
+        bfs{bfs::BFS(fwdGraph), bfs::BFS(bwdGraph)},
+        topoEdges(),
+        workers() {
     if (numberOfThreads < 1) {
       throw std::runtime_error(
           "Number of threads should not be smaller than 1!");
@@ -144,11 +148,9 @@ public:
   void print() const {
     for (std::size_t v = 0; v < graph[FWD]->numVertices(); ++v) {
       std::cout << " -> " << v << "\n\t";
-      for (auto h : labels[FWD][v].nodes)
-        std::cout << h << " ";
+      for (auto h : labels[FWD][v].nodes) std::cout << h << " ";
       std::cout << "\n <- " << v << "\n\t";
-      for (auto h : labels[BWD][v].nodes)
-        std::cout << h << " ";
+      for (auto h : labels[BWD][v].nodes) std::cout << h << " ";
       std::cout << std::endl;
     }
   }
@@ -175,12 +177,12 @@ public:
       /* }; */
 
       auto degreeCompRandom = [&](const auto left, const auto right) {
-        return std::forward_as_tuple(graph[FWD]->degree(left) +
-                                         graph[BWD]->degree(left),
-                                     randomNumber[left]) >
-               std::forward_as_tuple(graph[FWD]->degree(right) +
-                                         graph[BWD]->degree(right),
-                                     randomNumber[right]);
+        return std::forward_as_tuple(
+                   graph[FWD]->degree(left) + graph[BWD]->degree(left),
+                   randomNumber[left]) >
+               std::forward_as_tuple(
+                   graph[FWD]->degree(right) + graph[BWD]->degree(right),
+                   randomNumber[right]);
       };
 
       std::iota(ordering.begin(), ordering.end(), 0);
