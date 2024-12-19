@@ -1,3 +1,8 @@
+/*
+ * Licensed under MIT License.
+ * Author: Patrick Steil
+*/
+
 #include "../datastructures/utils.h"
 
 #include <cstdint>

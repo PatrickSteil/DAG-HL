@@ -1,3 +1,8 @@
+/*
+ * Licensed under MIT License.
+ * Author: Patrick Steil
+*/
+
 #include "../datastructures/graph.h"
 #include "../datastructures/pruned_landmark_labeling.h"
 

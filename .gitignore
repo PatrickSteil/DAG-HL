@@ -2,3 +2,4 @@ build-*
 python*
 data*
 result*
+add_licences.sh
