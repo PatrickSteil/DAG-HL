@@ -24,7 +24,7 @@
 #include "status_log.h"
 
 struct PLL {
- public:
+public:
   std::array<std::vector<Label>, 2> &labels;
   std::array<std::vector<uint8_t>, 2> &lookup;
   std::vector<uint8_t> &alreadyProcessed;
@@ -35,11 +35,8 @@ struct PLL {
       std::array<std::vector<uint8_t>, 2> &lookup,
       std::vector<uint8_t> &alreadyProcessed,
       std::array<const Graph *, 2> &graph)
-      : labels(labels),
-        lookup(lookup),
-        alreadyProcessed(alreadyProcessed),
-        graph(graph),
-        bfs{bfs::BFS(*graph[FWD]), bfs::BFS(*graph[BWD])} {};
+      : labels(labels), lookup(lookup), alreadyProcessed(alreadyProcessed),
+        graph(graph), bfs{bfs::BFS(*graph[FWD]), bfs::BFS(*graph[BWD])} {};
 
   void run(const std::vector<Vertex> &ordering) {
     StatusLog log("Computing HLs");

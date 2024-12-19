@@ -75,9 +75,11 @@ int main(int argc, char *argv[]) {
 
   sortLabels(hl.labels);
 
-  if (showStats) hl.showStats();
+  if (showStats)
+    hl.showStats();
 
-  if (outputFileName != "") saveToFile(hl.labels, outputFileName);
+  if (outputFileName != "")
+    saveToFile(hl.labels, outputFileName);
 
   if (run_benchmark) {
     benchmark(hl.labels, 1000);

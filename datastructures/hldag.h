@@ -32,9 +32,8 @@
 #include "topological_sort.h"
 #include "utils.h"
 
-template <std::uint16_t SIZE = 64>
-struct HLDAG {
- public:
+template <std::uint16_t SIZE = 64> struct HLDAG {
+public:
   std::array<std::vector<Label>, 2> labels;
 
   std::vector<uint8_t> alreadyProcessed;
@@ -50,13 +49,10 @@ struct HLDAG {
 
   HLDAG(const Graph &fwdGraph, const Graph &bwdGraph,
         const int numberOfThreads = 1)
-      : labels{std::vector<Label>(), std::vector<Label>()},
-        alreadyProcessed(),
+      : labels{std::vector<Label>(), std::vector<Label>()}, alreadyProcessed(),
         graph{&fwdGraph, &bwdGraph},
         lookup{std::vector<uint8_t>(), std::vector<uint8_t>()},
-        bfs{bfs::BFS(fwdGraph), bfs::BFS(bwdGraph)},
-        topoEdges(),
-        workers() {
+        bfs{bfs::BFS(fwdGraph), bfs::BFS(bwdGraph)}, topoEdges(), workers() {
     if (numberOfThreads < 1) {
       throw std::runtime_error(
           "Number of threads should not be smaller than 1!");
@@ -114,21 +110,25 @@ struct HLDAG {
       }
 
       double avgSize = static_cast<double>(totalSize) / currentLabels.size();
-      return std::make_tuple(minSize, maxSize, avgSize);
+      return std::make_tuple(minSize, maxSize, avgSize, totalSize);
     };
 
-    auto [inMin, inMax, inAvg] = computeStats(labels[BWD]);
-    auto [outMin, outMax, outAvg] = computeStats(labels[FWD]);
+    auto [inMin, inMax, inAvg, inTotal] = computeStats(labels[BWD]);
+    auto [outMin, outMax, outAvg, outTotal] = computeStats(labels[FWD]);
 
     std::cout << "Forward Labels Statistics:" << std::endl;
-    std::cout << "  Min Size: " << outMin << std::endl;
-    std::cout << "  Max Size: " << outMax << std::endl;
-    std::cout << "  Avg Size: " << outAvg << std::endl;
+    std::cout << "  Min Size:     " << outMin << std::endl;
+    std::cout << "  Max Size:     " << outMax << std::endl;
+    std::cout << "  Avg Size:     " << outAvg << std::endl;
+    std::cout << "  # count:      " << outTotal << std::endl;
 
     std::cout << "Backward Labels Statistics:" << std::endl;
-    std::cout << "  Min Size: " << inMin << std::endl;
-    std::cout << "  Max Size: " << inMax << std::endl;
-    std::cout << "  Avg Size: " << inAvg << std::endl;
+    std::cout << "  Min Size:     " << inMin << std::endl;
+    std::cout << "  Max Size:     " << inMax << std::endl;
+    std::cout << "  Avg Size:     " << inAvg << std::endl;
+    std::cout << "  # count:      " << inTotal << std::endl;
+
+    std::cout << "Both # count:   " << (outTotal + inTotal) << std::endl;
 
     std::cout << "Total memory consumption [megabytes]:" << std::endl;
     std::cout << "  "
@@ -139,9 +139,11 @@ struct HLDAG {
   void print() const {
     for (std::size_t v = 0; v < graph[FWD]->numVertices(); ++v) {
       std::cout << " -> " << v << "\n\t";
-      for (auto h : labels[FWD][v].nodes) std::cout << h << " ";
+      for (auto h : labels[FWD][v].nodes)
+        std::cout << h << " ";
       std::cout << "\n <- " << v << "\n\t";
-      for (auto h : labels[BWD][v].nodes) std::cout << h << " ";
+      for (auto h : labels[BWD][v].nodes)
+        std::cout << h << " ";
       std::cout << std::endl;
     }
   }
@@ -153,12 +155,31 @@ struct HLDAG {
     if (fileName == "") {
       parallel_assign(ordering, graph[FWD]->numVertices(), Vertex(0));
 
+      std::vector<std::size_t> randomNumber;
+      parallel_assign_iota(randomNumber, graph[FWD]->numVertices(),
+                           static_cast<std::size_t>(0));
+
+      std::random_device rd;
+      std::mt19937 g(rd());
+
+      std::shuffle(randomNumber.begin(), randomNumber.end(), g);
+
+      /* auto degreeComp = [&](const auto left, const auto right) { */
+      /*   return graph[FWD]->degree(left) + graph[BWD]->degree(left) > */
+      /*          graph[FWD]->degree(right) + graph[BWD]->degree(right); */
+      /* }; */
+
+      auto degreeCompRandom = [&](const auto left, const auto right) {
+        return std::forward_as_tuple(graph[FWD]->degree(left) +
+                                         graph[BWD]->degree(left),
+                                     randomNumber[left]) >
+               std::forward_as_tuple(graph[FWD]->degree(right) +
+                                         graph[BWD]->degree(right),
+                                     randomNumber[right]);
+      };
+
       std::iota(ordering.begin(), ordering.end(), 0);
-      std::sort(ordering.begin(), ordering.end(),
-                [&](const auto left, const auto right) {
-                  return graph[FWD]->degree(left) + graph[BWD]->degree(left) >
-                         graph[FWD]->degree(right) + graph[BWD]->degree(right);
-                });
+      std::sort(ordering.begin(), ordering.end(), degreeCompRandom);
     } else {
       std::ifstream file(fileName);
       if (!file.is_open()) {

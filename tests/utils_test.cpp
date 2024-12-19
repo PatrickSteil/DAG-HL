@@ -1,8 +1,8 @@
 #include "../datastructures/utils.h"
 
-#include <gtest/gtest.h>
-
 #include <cstdint>
+#include <gtest/gtest.h>
+#include <numeric>
 #include <vector>
 
 class ParallelFillTest : public ::testing::Test {
@@ -58,4 +58,61 @@ TEST_F(ParallelFillTest, OddSizeVector) {
   parallel_fill(v, fill_value);
 
   verify_vector(v, fill_value);
+}
+
+class ParallelIotaTest : public ::testing::Test {
+protected:
+  template <typename T>
+  void verify_iota(const std::vector<T> &v, const T &start_value) {
+    T value = start_value;
+    for (const auto &elem : v) {
+      EXPECT_EQ(elem, value++)
+          << "Vector element does not match expected value.";
+    }
+  }
+};
+
+TEST_F(ParallelIotaTest, LargeVectorIota) {
+  std::vector<int> v(1000000);
+  int start_value = 42;
+
+  parallel_iota(v, start_value);
+
+  verify_iota(v, start_value);
+}
+
+TEST_F(ParallelIotaTest, EmptyVector) {
+  std::vector<int> v;
+  int start_value = 0;
+
+  parallel_iota(v, start_value);
+
+  EXPECT_TRUE(v.empty()) << "Empty vector test failed.";
+}
+
+TEST_F(ParallelIotaTest, SingleElement) {
+  std::vector<int> v(1);
+  int start_value = 99;
+
+  parallel_iota(v, start_value);
+
+  verify_iota(v, start_value);
+}
+
+TEST_F(ParallelIotaTest, DoubleVector) {
+  std::vector<double> v(1000);
+  double start_value = 3.14159;
+
+  parallel_iota(v, start_value);
+
+  verify_iota(v, start_value);
+}
+
+TEST_F(ParallelIotaTest, OddSizeVector) {
+  std::vector<int> v(1001);
+  int start_value = -1;
+
+  parallel_iota(v, start_value);
+
+  verify_iota(v, start_value);
 }

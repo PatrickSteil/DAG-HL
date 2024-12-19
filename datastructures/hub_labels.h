@@ -48,7 +48,8 @@ struct Label {
   }
 
   void setDeltaRepresentation() {
-    if (nodes.empty()) return;
+    if (nodes.empty())
+      return;
 
     std::vector<Vertex> new_nodes;
     new_nodes.reserve(nodes.size());
@@ -76,12 +77,47 @@ bool query(std::array<std::vector<Label>, 2> &labels, const Vertex from,
   const auto &toLabels = labels[BWD][to];
 
   while (i < fromLabels.size() && j < toLabels.size()) {
-    if (fromLabels[i] == toLabels[j]) return true;
+    if (fromLabels[i] == toLabels[j])
+      return true;
 
     if (fromLabels[i] < toLabels[j]) {
       i++;
     } else {
       j++;
+    }
+  }
+
+  return false;
+}
+
+// TODO test this method
+bool queryDeltaRepresentation(std::array<std::vector<Label>, 2> &labels,
+                              const Vertex from, const Vertex to) {
+  if (from == to) [[unlikely]]
+    return true;
+
+  const auto &fromLabels = labels[FWD][from];
+  const auto &toLabels = labels[BWD][to];
+
+  if (fromLabels.size() == 0 || toLabels.size() == 0) [[unlikely]] {
+    return false;
+  }
+
+  Vertex fromHub = fromLabels[0];
+  Vertex toHub = toLabels[0];
+
+  std::size_t i = 0;
+  std::size_t j = 0;
+
+  while (i < fromLabels.size() && j < toLabels.size()) {
+    if (fromHub == toHub) {
+      return true;
+    }
+
+    if (fromHub < toHub) {
+      fromHub += 1 + fromLabels[++i];
+    } else {
+      toHub += 1 + toLabels[++j];
     }
   }
 
@@ -173,14 +209,15 @@ void readFromFile(std::array<std::vector<Label>, 2> &labels,
   }
 }
 
-std::vector<Vertex> computePermutation(
-    const std::array<std::vector<Label>, 2> &labels) {
+std::vector<Vertex>
+computePermutation(const std::array<std::vector<Label>, 2> &labels) {
   StatusLog log("Compute Hub permutation");
   const std::size_t numVertices = labels[0].size();
-  std::vector<Vertex> result(numVertices);
-  std::iota(result.begin(), result.end(), 0);
+  std::vector<Vertex> result;
+  parallel_assign_iota(result, numVertices, Vertex(0));
 
-  std::vector<std::uint32_t> freq(numVertices, 0);
+  std::vector<std::uint32_t> freq;
+  parallel_assign(freq, numVertices, static_cast<std::uint32_t>(0));
 
   for (DIRECTION dir : {FWD, BWD}) {
     for (auto &lab : labels[dir]) {

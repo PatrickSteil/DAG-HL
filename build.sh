@@ -1,5 +1,6 @@
 #!/usr/bin/bash
 
+rm -rf build-release build-debug build-san
 mkdir -p build-release build-debug build-san
 
 cd build-release
