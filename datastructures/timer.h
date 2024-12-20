@@ -1,12 +1,7 @@
-/*
- * Licensed under MIT License.
- * Author: Patrick Steil
- */
+// Taken from Ben Strasser
 
 #ifndef TIMER_H
 #define TIMER_H
-
-// Taken from Ben Strasser in his CSA code
 
 #include <sys/time.h>
 

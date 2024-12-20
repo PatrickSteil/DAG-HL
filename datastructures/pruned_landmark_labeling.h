@@ -83,9 +83,8 @@ struct PLL {
     auto runOneDirection = [&](const DIRECTION dir) -> void {
       bfs[dir].run(v, bfs::noOp, [&](const Vertex w) {
         return alreadyProcessed[w] ||
-               std::any_of(labels[!dir][w].nodes.begin(),
-                           labels[!dir][w].nodes.end(),
-                           [&](const Vertex h) { return lookup[dir][h]; });
+               labels[!dir][w].appliesToAny(
+                   [&](const Vertex h) { return lookup[dir][h]; });
         /* return alreadyProcessed[w] || (mask & reached[dir][w]) || */
         /*        std::any_of( */
         /*            labels[!dir][w].nodes.begin(),

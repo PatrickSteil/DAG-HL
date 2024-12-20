@@ -22,6 +22,7 @@
 #include <concepts>
 #include <cstdint>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <limits>
 #include <random>
@@ -90,6 +91,11 @@ struct HLDAG {
     for (; i < numVertices; ++i) {
       workers[0].runPrunedBFS(ordering[i]);
     }
+    /* #pragma omp parallel for schedule(dynamic, 32) */
+    /*     for (; i < numVertices; ++i) { */
+    /*       int threadId = omp_get_thread_num(); */
+    /*       workers[threadId].runPrunedBFS(ordering[i]); */
+    /*     } */
   }
 
   std::size_t computeTotalBytes() const {
@@ -124,6 +130,9 @@ struct HLDAG {
 
     auto [inMin, inMax, inAvg, inTotal] = computeStats(labels[BWD]);
     auto [outMin, outMax, outAvg, outTotal] = computeStats(labels[FWD]);
+
+    std::locale::global(std::locale("de_DE.UTF-8"));
+    std::cout.imbue(std::locale());
 
     std::cout << "Forward Labels Statistics:" << std::endl;
     std::cout << "  Min Size:     " << outMin << std::endl;

@@ -27,7 +27,7 @@ void configure_parser(cli::Parser &parser) {
   parser.set_optional<bool>("c", "compress_labels", false,
                             "Reorders hubs, and computes Delta compression");
   parser.set_optional<bool>("b", "benchmark_queries", false,
-                            "Runs a small (1000) query benchmark");
+                            "Runs a small (10.000) query benchmark");
 };
 
 int main(int argc, char *argv[]) {
@@ -80,7 +80,7 @@ int main(int argc, char *argv[]) {
   if (outputFileName != "") saveToFile(hl.labels, outputFileName);
 
   if (run_benchmark) {
-    benchmark(hl.labels, 1000);
+    benchmark(hl.labels, 10000);
   }
   return 0;
 }

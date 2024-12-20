@@ -1,12 +1,11 @@
-/*
- * Licensed under MIT License.
- * Author: Patrick Steil
- */
+// Taken from Ben Strasser
 
 #ifndef STATUS_LOG_H
 #define STATUS_LOG_H
 
+#include <iomanip>
 #include <iostream>
+#include <locale>
 #include <string>
 
 #include "timer.h"
@@ -27,6 +26,9 @@ class StatusLog {
     time = -get_micro_time();
   }
   ~StatusLog() {
+    std::locale::global(std::locale("de_DE.UTF-8"));
+    std::cout.imbue(std::locale());
+
     time += get_micro_time();
     std::cout << "done [" << time / 1000 << "ms]" << std::endl;
   }

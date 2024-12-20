@@ -37,9 +37,18 @@ struct Label {
   Vertex &operator[](std::size_t i) { return nodes[i]; }
   const Vertex &operator[](std::size_t i) const { return nodes[i]; }
 
+  // toVerfiy should take (const Vertex h) as argument
+  template <typename FUNC>
+  bool appliesToAny(FUNC &&toVerfiy) {
+    return std::any_of(nodes.begin(), nodes.end(), toVerfiy);
+  }
+
   void reserve(const std::size_t size) { nodes.reserve(size); };
+
   std::size_t size() const { return nodes.size(); };
+
   void add(const Vertex hub) { nodes.push_back(hub); };
+
   bool contains(const Vertex hub) {
     return std::find(nodes.begin(), nodes.end(), hub) != nodes.end();
   };
@@ -68,6 +77,28 @@ struct Label {
 
     nodes = std::move(new_nodes);
   }
+};
+
+struct LabelThreadSafe : Label {
+  mutable std::mutex mutex;
+
+  void add(const Vertex hub) {
+    std::lock_guard<std::mutex> lock(mutex);
+    nodes.push_back(hub);
+  };
+
+  bool contains(const Vertex hub) {
+    std::lock_guard<std::mutex> lock(mutex);
+    return std::find(nodes.begin(), nodes.end(), hub) != nodes.end();
+  };
+
+  template <typename FUNC>
+  bool appliesToAny(FUNC &&toVerfiy) {
+    std::lock_guard<std::mutex> lock(mutex);
+    return std::any_of(nodes.begin(), nodes.end(), toVerfiy);
+  }
+
+  // all other methods will likely not be called in parallel
 };
 
 bool query(std::array<std::vector<Label>, 2> &labels, const Vertex from,
@@ -216,6 +247,7 @@ std::vector<Vertex> computePermutation(
     const std::array<std::vector<Label>, 2> &labels) {
   StatusLog log("Compute Hub permutation");
   const std::size_t numVertices = labels[0].size();
+
   std::vector<Vertex> result;
   parallel_assign_iota(result, numVertices, Vertex(0));
 

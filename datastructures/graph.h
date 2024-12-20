@@ -4,13 +4,14 @@
  */
 
 #pragma once
-
 #include <algorithm>
 #include <cassert>
 #include <cstdint>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <limits>
+#include <locale>
 #include <sstream>
 #include <string>
 #include <tuple>
@@ -45,7 +46,11 @@ struct Graph {
 
   std::size_t numVertices() const { return adjArray.size() - 1; }
   std::size_t numEdges() const { return toVertex.size(); }
+
   void print() const {
+    std::locale::global(std::locale("de_DE.UTF-8"));
+    std::cout.imbue(std::locale());
+
     std::cout << "NumVertices: " << numVertices() << std::endl;
     std::cout << "NumEdges: " << numEdges() << std::endl;
 
@@ -290,6 +295,9 @@ struct Graph {
   }
 
   void showStats() const {
+    std::locale::global(std::locale("de_DE.UTF-8"));
+    std::cout.imbue(std::locale());
+
     if (numVertices() == 0) {
       std::cout << "Graph is empty.\n";
       return;

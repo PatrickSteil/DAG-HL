@@ -5,9 +5,11 @@
 
 #pragma once
 
+#include <atomic>
 #include <cassert>
 #include <concepts>
 #include <cstdint>
+#include <memory>
 #include <mutex>
 #include <vector>
 
@@ -73,7 +75,7 @@ class FixedSizedQueueThreadSafe {
     std::lock_guard<std::mutex> lock_read(mutex_read, std::adopt_lock);
     std::lock_guard<std::mutex> lock_write(mutex_write, std::adopt_lock);
 
-    if (read == write) {
+    if (read == write) [[unlikely]] {
       return static_cast<VertexType>(-1);
     }
     /* assert(read < write); */
@@ -103,6 +105,63 @@ class FixedSizedQueueThreadSafe {
   std::vector<VertexType> data;
   std::size_t read;
   std::size_t write;
+};
+
+// From exersice 4
+template <class T>
+class ConcurrentQueue {
+  static_assert(std::is_default_constructible<T>::value,
+                "T must be default constructible.");
+
+ public:
+  explicit ConcurrentQueue(std::size_t capacity)
+      : capacity_(capacity),
+        data_(std::make_unique<AlignedData<T>[]>(capacity)),
+        read_(0),
+        write_(0) {}
+
+  bool try_push(const T &value) {
+    assert(value != T{});
+
+    std::size_t write_index = write_.load(std::memory_order_relaxed);
+    std::size_t next_write_index = (write_index + 1) % capacity_;
+
+    if (next_write_index == read_.load(std::memory_order_acquire)) {
+      return false;
+    }
+
+    data_[write_index]().store(value, std::memory_order_release);
+    write_.store(next_write_index, std::memory_order_release);
+    return true;
+  }
+
+  bool try_pop(T &value) {
+    std::size_t read_index = read_.load(std::memory_order_relaxed);
+
+    if (read_index == write_.load(std::memory_order_acquire)) {
+      return false;
+    }
+
+    value = data_[read_index]().load(std::memory_order_acquire);
+    data_[read_index]().store(T{}, std::memory_order_release);
+    read_.store((read_index + 1) % capacity_, std::memory_order_release);
+    return true;
+  }
+
+ private:
+  template <typename L>
+  struct alignas(64) AlignedData {
+    std::atomic<L> data;
+
+    std::atomic<L> &operator()() { return data; }
+
+    const std::atomic<L> &operator()() const { return data; }
+  };
+
+  const std::size_t capacity_;
+  std::unique_ptr<AlignedData<T>[]> data_;
+  std::atomic<std::size_t> read_;
+  std::atomic<std::size_t> write_;
 };
 
 // class that handles whether we have already seen a vertex
@@ -146,44 +205,52 @@ template <std::integral GenerationType = std::uint16_t>
 class GenerationCheckerThreadSafe {
  public:
   explicit GenerationCheckerThreadSafe(std::size_t size = 0)
-      : seen(size, 0), generation(1) {}
-
-  void resize(std::size_t size) {
-    std::lock_guard<std::mutex> lock(mutex);
-    parallel_assign(seen, size, static_cast<GenerationType>(0));
-    generation = 1;
-  }
-
-  void reset() {
-    std::lock_guard<std::mutex> lock(mutex);
-    ++generation;
-    if (generation == 0) {
-      std::fill(seen.begin(), seen.end(), 0);
-      ++generation;
+      : seen(size), generation(1) {
+    for (auto &val : seen) {
+      val.store(0, std::memory_order_release);
     }
   }
 
-  bool isValid(std::size_t i) const {
-    std::lock_guard<std::mutex> lock(mutex);
-    return i < seen.size();
+  void resize(std::size_t size) {
+    std::vector<std::atomic<GenerationType>> new_seen(size);
+    for (std::size_t i = 0; i < size && i < seen.size(); ++i) {
+      new_seen[i].store(seen[i].load(std::memory_order_acquire),
+                        std::memory_order_release);
+    }
+    for (std::size_t i = seen.size(); i < size; ++i) {
+      new_seen[i].store(0, std::memory_order_release);
+    }
+    seen = std::move(new_seen);
+    generation.store(1, std::memory_order_relaxed);
   }
 
+  void reset() {
+    auto current_gen = generation.fetch_add(1, std::memory_order_acq_rel) + 1;
+    if (current_gen == 0) {
+      for (auto &val : seen) {
+        val.store(0, std::memory_order_release);
+      }
+      generation.store(1, std::memory_order_release);
+    }
+  }
+
+  bool isValid(std::size_t i) const { return i < seen.size(); }
+
   bool isMarked(std::size_t i) const {
-    std::lock_guard<std::mutex> lock(mutex);
     assert(isValid(i));
-    return seen[i] == generation;
+    return seen[i].load(std::memory_order_acquire) ==
+           generation.load(std::memory_order_acquire);
   }
 
   void mark(std::size_t i) {
-    std::lock_guard<std::mutex> lock(mutex);
     assert(isValid(i));
-    seen[i] = generation;
+    seen[i].store(generation.load(std::memory_order_acquire),
+                  std::memory_order_release);
   }
 
  private:
-  mutable std::mutex mutex;
-  std::vector<GenerationType> seen;
-  GenerationType generation;
+  std::vector<std::atomic<GenerationType>> seen;
+  std::atomic<GenerationType> generation;
 };
 
 }  // namespace bfs

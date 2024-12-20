@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <concepts>
+#include <iostream>
 #include <numeric>
 #include <random>
 #include <vector>
