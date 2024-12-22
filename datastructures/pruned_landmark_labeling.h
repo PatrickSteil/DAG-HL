@@ -28,15 +28,16 @@
 #include "hub_labels.h"
 #include "status_log.h"
 
+template <class LABEL = Label>
 struct PLL {
  public:
-  std::array<std::vector<Label>, 2> &labels;
+  std::array<std::vector<LABEL>, 2> &labels;
   std::array<std::vector<uint8_t>, 2> &lookup;
   std::vector<uint8_t> &alreadyProcessed;
   std::array<const Graph *, 2> &graph;
   std::array<bfs::BFS, 2> bfs;
 
-  PLL(std::array<std::vector<Label>, 2> &labels,
+  PLL(std::array<std::vector<LABEL>, 2> &labels,
       std::array<std::vector<uint8_t>, 2> &lookup,
       std::vector<uint8_t> &alreadyProcessed,
       std::array<const Graph *, 2> &graph)
@@ -61,8 +62,8 @@ struct PLL {
   }
 
   void init(std::size_t numVertices) {
-    labels[BWD].assign(numVertices, Label());
-    labels[FWD].assign(numVertices, Label());
+    labels[BWD].assign(numVertices, LABEL());
+    labels[FWD].assign(numVertices, LABEL());
 
     lookup[BWD].assign(numVertices, false);
     lookup[FWD].assign(numVertices, false);
@@ -86,12 +87,12 @@ struct PLL {
       });
     };
 
-    /* #pragma omp parallel for */
+#pragma omp parallel for num_threads(2)
     for (auto dir : {FWD, BWD}) {
       runOneDirection(dir);
     }
 
-    /* #pragma omp parallel for */
+#pragma omp parallel for num_threads(2)
     for (auto dir : {FWD, BWD}) {
       bfs[dir].doForAllVerticesInQ([&](const Vertex u) {
         assert(!labels[!dir][u].contains(v));

@@ -32,6 +32,24 @@ enum DIRECTION : bool { FWD, BWD };
 struct Label {
   Label(){};
 
+  Label(const Label &other) : nodes(other.nodes) {}
+
+  Label(Label &&other) noexcept : nodes(std::move(other.nodes)) {}
+
+  Label &operator=(const Label &other) {
+    if (this != &other) {
+      nodes = other.nodes;
+    }
+    return *this;
+  }
+
+  Label &operator=(Label &&other) noexcept {
+    if (this != &other) {
+      nodes = std::move(other.nodes);
+    }
+    return *this;
+  }
+
   std::vector<Vertex> nodes;
 
   Vertex &operator[](std::size_t i) { return nodes[i]; }
@@ -61,6 +79,8 @@ struct Label {
     std::sort(nodes.begin(), nodes.end());
   }
 
+  void sort() { std::sort(nodes.begin(), nodes.end()); }
+
   void setDeltaRepresentation() {
     if (nodes.empty()) return;
 
@@ -82,6 +102,28 @@ struct Label {
 struct LabelThreadSafe : Label {
   mutable std::mutex mutex;
 
+  LabelThreadSafe() {}
+
+  LabelThreadSafe(const LabelThreadSafe &other) : Label(other) {}
+
+  LabelThreadSafe(LabelThreadSafe &&other) noexcept : Label(std::move(other)) {}
+
+  LabelThreadSafe &operator=(const LabelThreadSafe &other) {
+    if (this != &other) {
+      std::lock_guard<std::mutex> lock(mutex);
+      Label::operator=(other);
+    }
+    return *this;
+  }
+
+  LabelThreadSafe &operator=(LabelThreadSafe &&other) noexcept {
+    if (this != &other) {
+      std::lock_guard<std::mutex> lock(mutex);
+      Label::operator=(std::move(other));
+    }
+    return *this;
+  }
+
   void add(const Vertex hub) {
     std::lock_guard<std::mutex> lock(mutex);
     nodes.push_back(hub);
@@ -98,10 +140,15 @@ struct LabelThreadSafe : Label {
     return std::any_of(nodes.begin(), nodes.end(), toVerfiy);
   }
 
+  void sort() {
+    std::lock_guard<std::mutex> lock(mutex);
+    std::sort(nodes.begin(), nodes.end());
+  }
   // all other methods will likely not be called in parallel
 };
 
-bool query(std::array<std::vector<Label>, 2> &labels, const Vertex from,
+template <class LABEL = Label>
+bool query(std::array<std::vector<LABEL>, 2> &labels, const Vertex from,
            const Vertex to) {
   if (from == to) [[unlikely]]
     return true;
@@ -158,7 +205,8 @@ bool queryDeltaRepresentation(std::array<std::vector<Label>, 2> &labels,
   return false;
 }
 
-void saveToFile(std::array<std::vector<Label>, 2> &labels,
+template <class LABEL = Label>
+void saveToFile(std::array<std::vector<LABEL>, 2> &labels,
                 const std::string &fileName) {
   std::ofstream outFile(fileName);
 
@@ -191,7 +239,8 @@ void saveToFile(std::array<std::vector<Label>, 2> &labels,
   }
 }
 
-void readFromFile(std::array<std::vector<Label>, 2> &labels,
+template <class LABEL = Label>
+void readFromFile(std::array<std::vector<LABEL>, 2> &labels,
                   const std::string &fileName) {
   std::ifstream inFile(fileName);
 
@@ -243,8 +292,9 @@ void readFromFile(std::array<std::vector<Label>, 2> &labels,
   }
 }
 
+template <class LABEL = Label>
 std::vector<Vertex> computePermutation(
-    const std::array<std::vector<Label>, 2> &labels) {
+    const std::array<std::vector<LABEL>, 2> &labels) {
   StatusLog log("Compute Hub permutation");
   const std::size_t numVertices = labels[0].size();
 
@@ -277,21 +327,23 @@ std::vector<Vertex> computePermutation(
   return result;
 }
 
-void sortLabels(std::array<std::vector<Label>, 2> &labels) {
+template <class LABEL = Label>
+void sortLabels(std::array<std::vector<LABEL>, 2> &labels) {
   StatusLog log("Sort all labels");
 
 #pragma omp parallel for
   for (std::size_t i = 0; i < labels[FWD].size(); ++i) {
-    std::sort(labels[FWD][i].nodes.begin(), labels[FWD][i].nodes.end());
+    labels[FWD][i].sort();
   }
 
 #pragma omp parallel for
   for (std::size_t i = 0; i < labels[BWD].size(); ++i) {
-    std::sort(labels[BWD][i].nodes.begin(), labels[BWD][i].nodes.end());
+    labels[BWD][i].sort();
   }
 }
 
-void benchmark(std::array<std::vector<Label>, 2> &labels,
+template <class LABEL = Label>
+void benchmark(std::array<std::vector<LABEL>, 2> &labels,
                const std::size_t numQueries) {
   using std::chrono::duration;
   using std::chrono::duration_cast;

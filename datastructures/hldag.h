@@ -37,19 +37,20 @@
 #include "topological_sort.h"
 #include "utils.h"
 
+template <class LABEL = Label>
 struct HLDAG {
  public:
-  std::array<std::vector<Label>, 2> labels;
+  std::array<std::vector<LABEL>, 2> labels;
 
   std::vector<uint8_t> alreadyProcessed;
   std::array<const Graph *, 2> graph;
 
   std::array<std::vector<uint8_t>, 2> lookup;
 
-  PLL pll;
+  PLL<LABEL> pll;
 
   HLDAG(const Graph &fwdGraph, const Graph &bwdGraph)
-      : labels{std::vector<Label>(), std::vector<Label>()},
+      : labels{std::vector<LABEL>(), std::vector<LABEL>()},
         alreadyProcessed(),
         graph{&fwdGraph, &bwdGraph},
         lookup{std::vector<uint8_t>(), std::vector<uint8_t>()},
@@ -79,7 +80,7 @@ struct HLDAG {
 
     for (const auto &labelSet : labels) {
       for (const auto &label : labelSet) {
-        totalBytes += sizeof(Label);
+        totalBytes += sizeof(LABEL);
         totalBytes += label.nodes.capacity() * sizeof(Vertex);
       }
     }
@@ -88,7 +89,7 @@ struct HLDAG {
   }
 
   void showStats() const {
-    auto computeStats = [](const std::vector<Label> &currentLabels) {
+    auto computeStats = [](const std::vector<LABEL> &currentLabels) {
       std::size_t minSize = std::numeric_limits<std::size_t>::max();
       std::size_t maxSize = 0;
       std::size_t totalSize = 0;
@@ -239,8 +240,8 @@ struct HLDAG {
   };
 
   void init(std::size_t numVertices) {
-    parallel_assign(labels[BWD], numVertices, Label());
-    parallel_assign(labels[FWD], numVertices, Label());
+    parallel_assign(labels[BWD], numVertices, LABEL());
+    parallel_assign(labels[FWD], numVertices, LABEL());
     parallel_assign(alreadyProcessed, numVertices, uint8_t(0));
 
     parallel_assign(lookup[BWD], numVertices, uint8_t(0));
