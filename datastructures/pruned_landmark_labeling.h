@@ -76,8 +76,6 @@ struct PLL {
   void runPrunedBFS(const Vertex v) {
     assert(v < labels[BWD].size());
 
-    /* SIZE mask = (static_cast<SIZE>(1) << threadId) - 1; */
-
     modifyLookups(v, true);
 
     auto runOneDirection = [&](const DIRECTION dir) -> void {
@@ -85,11 +83,6 @@ struct PLL {
         return alreadyProcessed[w] ||
                labels[!dir][w].appliesToAny(
                    [&](const Vertex h) { return lookup[dir][h]; });
-        /* return alreadyProcessed[w] || (mask & reached[dir][w]) || */
-        /*        std::any_of( */
-        /*            labels[!dir][w].nodes.begin(),
-         * labels[!dir][w].nodes.end(), */
-        /*            [&](const Vertex h) { return lookup[dir][h]; }); */
       });
     };
 
@@ -105,18 +98,6 @@ struct PLL {
         labels[!dir][u].add(v);
       });
     }
-
-    /*     runOneDirection(FWD); */
-    /*     bfs[FWD].doForAllVerticesInQ([&](const Vertex u) { */
-    /*       assert(!labels[!FWD][u].contains(v)); */
-    /*       labels[!FWD][u].add(v); */
-    /*     }); */
-
-    /*     runOneDirection(BWD); */
-    /*     bfs[BWD].doForAllVerticesInQ([&](const Vertex u) { */
-    /*       assert(!labels[!BWD][u].contains(v)); */
-    /*       labels[!BWD][u].add(v); */
-    /*     }); */
 
     alreadyProcessed[v] = true;
     modifyLookups(v, false);

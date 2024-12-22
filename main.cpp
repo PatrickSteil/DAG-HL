@@ -59,7 +59,7 @@ int main(int argc, char *argv[]) {
 
   Graph rev = g.reverseGraph();
 
-  HLDAG<> hl(g, rev);
+  HLDAG hl(g, rev);
 
   hl.run(orderingFile);
 

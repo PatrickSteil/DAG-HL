@@ -16,7 +16,7 @@ class StatusLog {
   StatusLog &operator=(const StatusLog &) = delete;
   long long time;
 
-public:
+ public:
   StatusLog(const std::string &msg) {
     std::cout << msg << " ... " << std::flush;
     time = -get_micro_time();

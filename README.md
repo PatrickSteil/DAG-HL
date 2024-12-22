@@ -16,6 +16,7 @@ Or if you only want to build the release version, call:
 mkdir -p build-release 
 cd build-release
 cmake -DCMAKE_BUILD_TYPE=Release ..
+make
 ```
 
 The project supports three build configurations:

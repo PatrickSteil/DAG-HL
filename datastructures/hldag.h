@@ -11,6 +11,9 @@
 #define PREFETCH(addr)
 #endif
 
+#include <immintrin.h>
+#include <omp.h>
+
 #include <algorithm>
 #include <array>
 #include <bitset>
@@ -19,17 +22,14 @@
 #include <concepts>
 #include <cstdint>
 #include <fstream>
-#include <immintrin.h>
 #include <iomanip>
 #include <iostream>
 #include <limits>
-#include <omp.h>
 #include <random>
 #include <set>
 #include <stdexcept>
 #include <vector>
 
-#include "bfs.h"
 #include "graph.h"
 #include "hub_labels.h"
 #include "pruned_landmark_labeling.h"
@@ -37,35 +37,23 @@
 #include "topological_sort.h"
 #include "utils.h"
 
-template <std::uint16_t SIZE = 64> struct HLDAG {
-public:
+struct HLDAG {
+ public:
   std::array<std::vector<Label>, 2> labels;
 
   std::vector<uint8_t> alreadyProcessed;
   std::array<const Graph *, 2> graph;
 
   std::array<std::vector<uint8_t>, 2> lookup;
-  std::array<bfs::BFS, 2> bfs;
 
-  std::vector<std::size_t> topoRank;
-  std::vector<Edge> topoEdges;
+  PLL pll;
 
-  std::vector<PLL> workers;
-
-  HLDAG(const Graph &fwdGraph, const Graph &bwdGraph,
-        const int numberOfThreads = 1)
-      : labels{std::vector<Label>(), std::vector<Label>()}, alreadyProcessed(),
+  HLDAG(const Graph &fwdGraph, const Graph &bwdGraph)
+      : labels{std::vector<Label>(), std::vector<Label>()},
+        alreadyProcessed(),
         graph{&fwdGraph, &bwdGraph},
         lookup{std::vector<uint8_t>(), std::vector<uint8_t>()},
-        bfs{bfs::BFS(fwdGraph), bfs::BFS(bwdGraph)}, topoEdges(), workers() {
-    if (numberOfThreads < 1) {
-      throw std::runtime_error(
-          "Number of threads should not be smaller than 1!");
-    }
-    workers.reserve(numberOfThreads);
-    for (int t = 0; t < numberOfThreads; ++t) {
-      workers.emplace_back(labels, lookup, alreadyProcessed, graph);
-    }
+        pll(labels, lookup, alreadyProcessed, graph) {
     init(fwdGraph.numVertices());
   };
 
@@ -81,16 +69,9 @@ public:
     assert(ordering.size() == numVertices);
     assert(isOrdering(ordering, numVertices));
 
-    std::size_t i = 0;
-
-    for (; i < numVertices; ++i) {
-      workers[0].runPrunedBFS(ordering[i]);
+    for (std::size_t i; i < numVertices; ++i) {
+      pll.runPrunedBFS(ordering[i]);
     }
-    /* #pragma omp parallel for schedule(dynamic, 32) */
-    /*     for (; i < numVertices; ++i) { */
-    /*       int threadId = omp_get_thread_num(); */
-    /*       workers[threadId].runPrunedBFS(ordering[i]); */
-    /*     } */
   }
 
   std::size_t computeTotalBytes() const {
@@ -140,7 +121,7 @@ public:
     std::cout << "  Avg Size:     " << inAvg << std::endl;
 
     std::cout << "FWD # count:    " << outTotal << std::endl;
-    std::cout << "BWD # count:    " << outTotal << std::endl;
+    std::cout << "BWD # count:    " << inTotal << std::endl;
     std::cout << "Both # count:   " << (outTotal + inTotal) << std::endl;
 
     std::cout << "Total memory consumption [megabytes]:" << std::endl;
@@ -152,11 +133,9 @@ public:
   void print() const {
     for (std::size_t v = 0; v < graph[FWD]->numVertices(); ++v) {
       std::cout << " -> " << v << "\n\t";
-      for (auto h : labels[FWD][v].nodes)
-        std::cout << h << " ";
+      for (auto h : labels[FWD][v].nodes) std::cout << h << " ";
       std::cout << "\n <- " << v << "\n\t";
-      for (auto h : labels[BWD][v].nodes)
-        std::cout << h << " ";
+      for (auto h : labels[BWD][v].nodes) std::cout << h << " ";
       std::cout << std::endl;
     }
   }
@@ -177,18 +156,13 @@ public:
 
       std::shuffle(randomNumber.begin(), randomNumber.end(), g);
 
-      /* auto degreeComp = [&](const auto left, const auto right) { */
-      /*   return graph[FWD]->degree(left) + graph[BWD]->degree(left) > */
-      /*          graph[FWD]->degree(right) + graph[BWD]->degree(right); */
-      /* }; */
-
       auto degreeCompRandom = [&](const auto left, const auto right) {
-        return std::forward_as_tuple(graph[FWD]->degree(left) +
-                                         graph[BWD]->degree(left),
-                                     randomNumber[left]) >
-               std::forward_as_tuple(graph[FWD]->degree(right) +
-                                         graph[BWD]->degree(right),
-                                     randomNumber[right]);
+        return std::forward_as_tuple(
+                   graph[FWD]->degree(left) + graph[BWD]->degree(left),
+                   randomNumber[left]) >
+               std::forward_as_tuple(
+                   graph[FWD]->degree(right) + graph[BWD]->degree(right),
+                   randomNumber[right]);
       };
 
       std::iota(ordering.begin(), ordering.end(), 0);
@@ -271,30 +245,6 @@ public:
 
     parallel_assign(lookup[BWD], numVertices, uint8_t(0));
     parallel_assign(lookup[FWD], numVertices, uint8_t(0));
-
-    bfs[FWD].reset(numVertices);
-    bfs[BWD].reset(numVertices);
-
-    /* parallel_assign(reached[BWD], numVertices, SIZE(0)); */
-    /* parallel_assign(reached[FWD], numVertices, SIZE(0)); */
-
-    parallel_assign(topoRank, numVertices, std::size_t(0));
-
-    TopologicalSort topoSort(*graph[FWD]);
-    for (std::size_t i = 0; i < topoSort.ordering.size(); ++i) {
-      topoRank[topoSort.ordering[i]] = i;
-    }
-
-    topoEdges.reserve(graph[FWD]->numEdges());
-
-    for (Vertex from = 0; from < numVertices; ++from) {
-      for (std::size_t i = graph[FWD]->beginEdge(from);
-           i < graph[FWD]->endEdge(from); ++i) {
-        topoEdges.emplace_back(from, graph[FWD]->toVertex[i]);
-      }
-    }
-
-    std::sort(topoEdges.begin(), topoEdges.end());
   }
 
   void modifyLookups(const Vertex v, bool value) {
@@ -312,27 +262,4 @@ public:
     forDir(FWD);
     forDir(BWD);
   }
-
-  /*   void runReachabilitySweep(const std::size_t n, */
-  /*                             const std::vector<Vertex> &ordering) { */
-  /*     parallel_fill(reached[0], 0); */
-  /*     parallel_fill(reached[1], 0); */
-
-  /* #pragma GCC unroll(4) */
-  /*     for (std::size_t j = 0; j < width; ++j) { */
-  /*       reached[0][ordering[n + j]] |= (1 << j); */
-  /*       reached[1][ordering[n + j]] |= (1 << j); */
-  /*     } */
-
-  /*     for (std::size_t i = 0; i < topoEdges.size(); ++i) { */
-  /*       const auto &edge = topoEdges[i]; */
-
-  /*       reached[0][edge.to] |= reached[0][edge.from]; */
-  /*     } */
-  /*     for (std::size_t i = topoEdges.size(); i > 0; --i) { */
-  /*       const auto &edge = topoEdges[i - 1]; */
-
-  /*       reached[0][edge.from] |= reached[0][edge.to]; */
-  /*     } */
-  /*   } */
 };
