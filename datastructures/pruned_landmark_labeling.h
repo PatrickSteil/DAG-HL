@@ -35,7 +35,8 @@ struct PLL {
   std::array<std::vector<uint8_t>, 2> &lookup;
   std::vector<uint8_t> &alreadyProcessed;
   std::array<const Graph *, 2> &graph;
-  std::array<bfs::BFS, 2> bfs;
+  std::array<bfs::ParallelBFS, 2> bfs;
+  /* std::array<bfs::BFS, 2> bfs; */
 
   PLL(std::array<std::vector<LABEL>, 2> &labels,
       std::array<std::vector<uint8_t>, 2> &lookup,
@@ -45,7 +46,8 @@ struct PLL {
         lookup(lookup),
         alreadyProcessed(alreadyProcessed),
         graph(graph),
-        bfs{bfs::BFS(*graph[FWD]), bfs::BFS(*graph[BWD])} {};
+        /* bfs{bfs::BFS(*graph[FWD]), bfs::BFS(*graph[BWD])} {}; */
+        bfs{bfs::ParallelBFS(*graph[FWD]), bfs::ParallelBFS(*graph[BWD])} {};
 
   void run(const std::vector<Vertex> &ordering) {
     StatusLog log("Computing HLs");
@@ -74,20 +76,24 @@ struct PLL {
     bfs[BWD].reset(numVertices);
   }
 
-  void runPrunedBFS(const Vertex v) {
+  void runPrunedBFS(const Vertex v, const int numThreads = 1) {
     assert(v < labels[BWD].size());
 
     modifyLookups(v, true);
 
     auto runOneDirection = [&](const DIRECTION dir) -> void {
-      bfs[dir].run(v, bfs::noOp, [&](const Vertex w) {
-        return alreadyProcessed[w] ||
-               labels[!dir][w].appliesToAny(
-                   [&](const Vertex h) { return lookup[dir][h]; });
-      });
+      bfs[dir].run(
+          v, bfs::noOp,
+          [&](const Vertex w) {
+            bool prune = (alreadyProcessed[w] ||
+                          labels[!dir][w].appliesToAny(
+                              [&](const Vertex h) { return lookup[dir][h]; }));
+            return prune;
+          },
+          numThreads);
     };
 
-#pragma omp parallel for num_threads(2)
+    /* #pragma omp parallel for num_threads(2) */
     for (auto dir : {FWD, BWD}) {
       runOneDirection(dir);
     }

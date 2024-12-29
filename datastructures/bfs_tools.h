@@ -99,7 +99,6 @@ class FixedSizedQueueThreadSafe {
     write = 0;
   }
 
- private:
   mutable std::mutex mutex_read;
   mutable std::mutex mutex_write;
   std::vector<VertexType> data;
@@ -200,57 +199,53 @@ class GenerationChecker {
   GenerationType generation;
 };
 
-// thread safe variant
 template <std::integral GenerationType = std::uint16_t>
 class GenerationCheckerThreadSafe {
  public:
   explicit GenerationCheckerThreadSafe(std::size_t size = 0)
-      : seen(size), generation(1) {
-    for (auto &val : seen) {
-      val.store(0, std::memory_order_release);
-    }
-  }
+      : seen(size, 0), generation(1) {}
 
   void resize(std::size_t size) {
-    std::vector<std::atomic<GenerationType>> new_seen(size);
-    for (std::size_t i = 0; i < size && i < seen.size(); ++i) {
-      new_seen[i].store(seen[i].load(std::memory_order_acquire),
-                        std::memory_order_release);
-    }
-    for (std::size_t i = seen.size(); i < size; ++i) {
-      new_seen[i].store(0, std::memory_order_release);
-    }
-    seen = std::move(new_seen);
-    generation.store(1, std::memory_order_relaxed);
+    std::lock_guard<std::mutex> lock(mutex);
+    seen.resize(size, 0);
+    generation = 1;
   }
 
   void reset() {
-    auto current_gen = generation.fetch_add(1, std::memory_order_acq_rel) + 1;
-    if (current_gen == 0) {
-      for (auto &val : seen) {
-        val.store(0, std::memory_order_release);
-      }
-      generation.store(1, std::memory_order_release);
+    std::lock_guard<std::mutex> lock(mutex);
+    ++generation;
+    if (generation == 0) {
+      std::fill(seen.begin(), seen.end(), 0);
+      generation = 1;
     }
   }
 
   bool isValid(std::size_t i) const { return i < seen.size(); }
 
   bool isMarked(std::size_t i) const {
+    std::lock_guard<std::mutex> lock(mutex);
     assert(isValid(i));
-    return seen[i].load(std::memory_order_acquire) ==
-           generation.load(std::memory_order_acquire);
+    return seen[i] == generation;
   }
 
   void mark(std::size_t i) {
+    std::lock_guard<std::mutex> lock(mutex);
     assert(isValid(i));
-    seen[i].store(generation.load(std::memory_order_acquire),
-                  std::memory_order_release);
+    seen[i] = generation;
+  }
+
+  bool tryMark(std::size_t i) {
+    std::lock_guard<std::mutex> lock(mutex);
+    assert(isValid(i));
+
+    bool overwrite = (seen[i] != generation);
+    seen[i] = (overwrite ? generation : seen[i]);
+    return overwrite;
   }
 
  private:
-  std::vector<std::atomic<GenerationType>> seen;
-  std::atomic<GenerationType> generation;
+  mutable std::mutex mutex;
+  std::vector<GenerationType> seen;
+  GenerationType generation;
 };
-
 }  // namespace bfs

@@ -18,6 +18,7 @@
 #include <chrono>
 #include <fstream>
 #include <iostream>
+#include <mutex>
 #include <numeric>
 #include <sstream>
 #include <vector>
@@ -99,52 +100,104 @@ struct Label {
   }
 };
 
-struct LabelThreadSafe : Label {
-  mutable std::mutex mutex;
+struct LabelThreadSafe {
+  LabelThreadSafe() = default;
 
-  LabelThreadSafe() {}
+  LabelThreadSafe(const LabelThreadSafe &other) {
+    std::lock_guard<std::mutex> lock(other.mutex_);
+    nodes = other.nodes;
+  }
 
-  LabelThreadSafe(const LabelThreadSafe &other) : Label(other) {}
-
-  LabelThreadSafe(LabelThreadSafe &&other) noexcept : Label(std::move(other)) {}
+  LabelThreadSafe(LabelThreadSafe &&other) noexcept {
+    std::lock_guard<std::mutex> lock(other.mutex_);
+    nodes = std::move(other.nodes);
+  }
 
   LabelThreadSafe &operator=(const LabelThreadSafe &other) {
     if (this != &other) {
-      std::lock_guard<std::mutex> lock(mutex);
-      Label::operator=(other);
+      std::scoped_lock lock(mutex_, other.mutex_);
+      nodes = other.nodes;
     }
     return *this;
   }
 
   LabelThreadSafe &operator=(LabelThreadSafe &&other) noexcept {
     if (this != &other) {
-      std::lock_guard<std::mutex> lock(mutex);
-      Label::operator=(std::move(other));
+      std::scoped_lock lock(mutex_, other.mutex_);
+      nodes = std::move(other.nodes);
     }
     return *this;
   }
 
-  void add(const Vertex hub) {
-    std::lock_guard<std::mutex> lock(mutex);
-    nodes.push_back(hub);
-  };
+  Vertex &operator[](std::size_t i) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return nodes[i];
+  }
 
-  bool contains(const Vertex hub) {
-    std::lock_guard<std::mutex> lock(mutex);
-    return std::find(nodes.begin(), nodes.end(), hub) != nodes.end();
-  };
+  const Vertex &operator[](std::size_t i) const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return nodes[i];
+  }
 
   template <typename FUNC>
-  bool appliesToAny(FUNC &&toVerfiy) {
-    std::lock_guard<std::mutex> lock(mutex);
-    return std::any_of(nodes.begin(), nodes.end(), toVerfiy);
+  bool appliesToAny(FUNC &&toVerify) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return std::any_of(nodes.begin(), nodes.end(), toVerify);
+  }
+
+  void reserve(const std::size_t size) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    nodes.reserve(size);
+  }
+
+  std::size_t size() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return nodes.size();
+  }
+
+  void add(const Vertex hub) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    nodes.push_back(hub);
+  }
+
+  bool contains(const Vertex hub) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return std::find(nodes.begin(), nodes.end(), hub) != nodes.end();
+  }
+
+  void applyPermutation(const std::vector<Vertex> &permutation) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    for (auto &hub : nodes) {
+      hub = permutation[hub];
+    }
+    std::sort(nodes.begin(), nodes.end());
   }
 
   void sort() {
-    std::lock_guard<std::mutex> lock(mutex);
+    std::lock_guard<std::mutex> lock(mutex_);
     std::sort(nodes.begin(), nodes.end());
   }
-  // all other methods will likely not be called in parallel
+
+  void setDeltaRepresentation() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (nodes.empty()) return;
+
+    std::vector<Vertex> new_nodes;
+    new_nodes.reserve(nodes.size());
+
+    new_nodes.push_back(nodes.front());
+
+    auto prevHub = nodes.front();
+    for (std::size_t i = 1; i < nodes.size(); ++i) {
+      new_nodes.push_back(nodes[i] - prevHub - 1);
+      prevHub = nodes[i];
+    }
+
+    nodes = std::move(new_nodes);
+  }
+
+  mutable std::mutex mutex_;
+  std::vector<Vertex> nodes;
 };
 
 template <class LABEL = Label>
@@ -353,9 +406,14 @@ void benchmark(std::array<std::vector<LABEL>, 2> &labels,
   assert(labels[FWD].size() == labels[BWD].size());
 
   auto queries =
-      generateRandomQueries<Vertex>(numQueries, 0, labels[FWD].size());
+      generateRandomQueries<Vertex>(numQueries, 0, labels[FWD].size() - 1);
   long double totalTime(0);
   for (std::pair<Vertex, Vertex> paar : queries) {
+    assert(paar.first < labels[FWD].size());
+    assert(paar.first < labels[BWD].size());
+    assert(paar.second < labels[FWD].size());
+    assert(paar.second < labels[BWD].size());
+
     auto t1 = high_resolution_clock::now();
     query(labels, paar.first, paar.second);
     auto t2 = high_resolution_clock::now();

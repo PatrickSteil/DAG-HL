@@ -59,9 +59,10 @@ int main(int argc, char *argv[]) {
 
   Graph rev = g.reverseGraph();
 
+  /* HLDAG<Label> hl(g, rev); */
   HLDAG<LabelThreadSafe> hl(g, rev);
 
-  hl.run(orderingFile);
+  hl.run(orderingFile, numThreads);
 
   if (compress) {
     auto permutation = computePermutation(hl.labels);

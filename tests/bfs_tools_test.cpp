@@ -54,10 +54,9 @@ TEST(GenerationCheckerThreadSafeTest, SequentialMarking) {
   std::vector<std::size_t> q(SIZE, 0);
 
   for (std::size_t i = 0; i < SIZE; ++i) {
-    if (checker.isMarked(i))
-      continue;
-    checker.mark(i);
-    q[i] = i;
+    if (checker.tryMark(i)) {
+      q[i] = i;
+    }
   }
 
   std::size_t totalSum = std::accumulate(q.begin(), q.end(), 0);
@@ -71,10 +70,9 @@ TEST(GenerationCheckerThreadSafeTest, ConcurrentMarking) {
   std::vector<std::size_t> q(SIZE, 0);
   auto worker = [&](std::size_t thread_id) {
     for (std::size_t i = thread_id; i < SIZE; ++i) {
-      if (checker.isMarked(i))
-        continue;
-      checker.mark(i);
-      q[i] = i;
+      if (checker.tryMark(i)) {
+        q[i] = i;
+      }
     }
   };
 

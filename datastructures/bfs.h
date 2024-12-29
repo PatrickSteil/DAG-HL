@@ -107,4 +107,92 @@ struct BFS {
   }
 };
 
+struct ParallelBFS {
+  const Graph &graph;
+  FixedSizedQueueThreadSafe<Vertex> q;
+  GenerationCheckerThreadSafe<> seen;
+  std::atomic<bool> workDone;
+
+  ParallelBFS(const Graph &graph)
+      : graph(graph),
+        q(graph.numVertices()),
+        seen(graph.numVertices()),
+        workDone(false) {}
+
+  void reset(const std::size_t numVertices) {
+    q.reset();
+    q.resize(numVertices);
+    seen.reset();
+    seen.resize(numVertices);
+    workDone = false;
+  }
+
+  template <typename ON_POP = decltype([](const Vertex) { return false; }),
+            typename ON_RELAX = decltype([](const Vertex) { return false; })>
+  void run(const Vertex root, ON_POP &&onPop = noOp, ON_RELAX &&onRelax = noOp,
+           std::size_t numThreads = 2) {
+    q.reset();
+    seen.reset();
+    workDone = false;
+
+    q.push(root);
+    seen.mark(root);
+
+    std::atomic<std::size_t> activeThreads{0};
+    std::atomic<bool> globalWorkDone{false};
+
+    auto worker = [&](int /* threadId */) {
+      while (true) {
+        Vertex u;
+        u = q.pop();
+
+        if (u == static_cast<Vertex>(-1)) {
+          if (--activeThreads == 0) {
+            globalWorkDone.store(true);
+            break;
+          }
+          if (globalWorkDone.load()) break;
+          std::this_thread::yield();
+          ++activeThreads;
+          continue;
+        }
+
+        if (onPop(u)) continue;
+
+        for (std::size_t i = graph.beginEdge(u); i < graph.endEdge(u); ++i) {
+          const Vertex w = graph.toVertex[i];
+
+          if (!seen.tryMark(w)) continue;
+
+          if (onRelax(w)) continue;
+
+          q.push(w);
+        }
+      }
+    };
+
+    activeThreads.store(numThreads);
+    std::vector<std::thread> threads;
+    for (std::size_t i = 0; i < numThreads; ++i) {
+      threads.emplace_back(worker, static_cast<int>(i));
+    }
+
+    for (auto &t : threads) {
+      t.join();
+    }
+  }
+
+  template <typename FUNC>
+  void doForAllVerticesInQ(FUNC &&func) {
+    std::lock(q.mutex_read, q.mutex_write);
+    std::lock_guard<std::mutex> lock_read(q.mutex_read, std::adopt_lock);
+    std::lock_guard<std::mutex> lock_write(q.mutex_write, std::adopt_lock);
+
+    for (std::size_t i = 0; i < q.read; ++i) {
+      const Vertex u = q.data[i];
+      func(u);
+    }
+  }
+};
+
 };  // namespace bfs

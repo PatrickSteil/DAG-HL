@@ -58,10 +58,12 @@ struct HLDAG {
     init(fwdGraph.numVertices());
   };
 
-  void run(const std::string &orderingFileName) {
+  void run(const std::string &orderingFileName, const int numThreads = 1) {
     StatusLog log("Computing HLs");
     assert(graph[FWD]->numVertices() == graph[BWD]->numVertices());
     assert(graph[FWD]->numEdges() == graph[BWD]->numEdges());
+    assert(labels[FWD].size() == graph[BWD]->numVertices());
+    assert(labels[BWD].size() == graph[BWD]->numVertices());
 
     const std::size_t numVertices = graph[FWD]->numVertices();
 
@@ -70,8 +72,8 @@ struct HLDAG {
     assert(ordering.size() == numVertices);
     assert(isOrdering(ordering, numVertices));
 
-    for (std::size_t i; i < numVertices; ++i) {
-      pll.runPrunedBFS(ordering[i]);
+    for (std::size_t i = 0; i < numVertices; ++i) {
+      pll.runPrunedBFS(ordering[i], numThreads);
     }
   }
 
@@ -152,8 +154,7 @@ struct HLDAG {
       parallel_assign_iota(randomNumber, graph[FWD]->numVertices(),
                            static_cast<std::size_t>(0));
 
-      std::random_device rd;
-      std::mt19937 g(rd());
+      std::mt19937 g(42);
 
       std::shuffle(randomNumber.begin(), randomNumber.end(), g);
 
