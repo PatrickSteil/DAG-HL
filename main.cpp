@@ -59,25 +59,31 @@ int main(int argc, char *argv[]) {
   }
 
   Graph rev = g.reverseGraph();
+
+  //// TEST
+  std::vector<bool> prune(g.numVertices(), false);
   TopologicalSort sorter(g);
   TreeSampler<> sampler(g, rev, sorter.ordering);
 
-  Drawer<Vertex> drawer(g.numVertices());
+  Drawer<Vertex> drawer;
+  std::vector<Vertex> allVertices;
+  parallel_assign_iota(allVertices, g.numVertices(), Vertex(0));
+  drawer.init(allVertices);
 
   std::vector<Vertex> sources;
   for (int i = 0; i < 8; ++i) {
     sources.emplace_back(drawer.pickRandom());
   }
 
-  sampler.computeParents(sources);
+  sampler.computeParents(sources, prune);
   sampler.computeDescendants();
 
+  std::size_t counter = 0;
+
   for (Vertex v = 0; v < g.numVertices(); ++v) {
-    if (sampler.totalDescendants(v) > 0)
-      std::cout << v << ": " << sampler.fwdDescendants(v) << ", "
-                << sampler.bwdDescendants(v) << ": "
-                << sampler.totalDescendants(v) << std::endl;
+    counter += (sampler.totalDescendants(v) > 0);
   }
+  std::cout << "Counter: " << counter << std::endl;
 
   return 0;
   /* HLDAG<Label> hl(g, rev); */
