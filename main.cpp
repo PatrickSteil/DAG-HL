@@ -9,6 +9,7 @@
 #include "datastructures/graph.h"
 #include "datastructures/hldag.h"
 #include "datastructures/hub_labels.h"
+#include "datastructures/sample_trees_simd.h"
 #include "external/cmdparser.hpp"
 
 void configure_parser(cli::Parser &parser) {
@@ -58,7 +59,27 @@ int main(int argc, char *argv[]) {
   }
 
   Graph rev = g.reverseGraph();
+  TopologicalSort sorter(g);
+  TreeSampler<> sampler(g, rev, sorter.ordering);
 
+  Drawer<Vertex> drawer(g.numVertices());
+
+  std::vector<Vertex> sources;
+  for (int i = 0; i < 8; ++i) {
+    sources.emplace_back(drawer.pickRandom());
+  }
+
+  sampler.computeParents(sources);
+  sampler.computeDescendants();
+
+  for (Vertex v = 0; v < g.numVertices(); ++v) {
+    if (sampler.totalDescendants(v) > 0)
+      std::cout << v << ": " << sampler.fwdDescendants(v) << ", "
+                << sampler.bwdDescendants(v) << ": "
+                << sampler.totalDescendants(v) << std::endl;
+  }
+
+  return 0;
   /* HLDAG<Label> hl(g, rev); */
   HLDAG<LabelThreadSafe> hl(g, rev);
 

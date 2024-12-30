@@ -72,8 +72,13 @@ struct HLDAG {
     assert(ordering.size() == numVertices);
     assert(isOrdering(ordering, numVertices));
 
-    for (std::size_t i = 0; i < numVertices; ++i) {
+    std::size_t i = 0;
+
+    for (; i < numVertices / 4; ++i) {
       pll.runPrunedBFS(ordering[i], numThreads);
+    }
+    for (; i < numVertices; ++i) {
+      pll.runPrunedBFS(ordering[i], 1);
     }
   }
 
