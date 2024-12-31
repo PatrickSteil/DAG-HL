@@ -57,3 +57,21 @@ endif()
 
 add_test(NAME unit_test COMMAND unit_test)
 
+# Benchmark setup
+option(ENABLE_BENCHMARKS "Enable building benchmarks" OFF)
+
+if(ENABLE_BENCHMARKS)
+    message(STATUS "Building benchmarks")
+
+    file(GLOB BENCHMARK_SOURCES benchmarks/*.cpp)
+
+    add_executable(benchmarks ${BENCHMARK_SOURCES})
+    target_include_directories(benchmarks PUBLIC datastructures)
+
+    find_package(benchmark REQUIRED)
+    target_link_libraries(benchmarks PRIVATE benchmark::benchmark)
+
+    if(OpenMP_CXX_FOUND)
+        target_link_libraries(benchmarks PUBLIC OpenMP::OpenMP_CXX)
+    endif()
+endif()

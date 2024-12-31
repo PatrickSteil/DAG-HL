@@ -14,6 +14,7 @@
 #include <vector>
 
 #include "types.h"
+#include "utils.h"
 
 template <typename Comparator = std::less<uint32_t>,
           std::integral IndexInt = std::uint32_t>
@@ -84,11 +85,11 @@ class PriorityQueue {
       if (left < size() && comp(heap[left].first, heap[smallest].first)) {
         smallest = left;
       }
+
       if (right < size() && comp(heap[right].first, heap[smallest].first)) {
         smallest = right;
       }
       if (smallest == i) return;
-
       swap(i, smallest);
       i = smallest;
     }
