@@ -30,7 +30,8 @@ inline void siftDown(uint32_t *data, std::size_t i) {
     bool update = (data[index] < data[smallest]);
     smallest = branchlessConditional(update, index, smallest);
 
-    if (smallest == i) break;
+    if (smallest == i)
+      break;
 
     std::swap(data[i], data[smallest]);
     i = smallest;
@@ -49,7 +50,7 @@ uint32_t pop(uint32_t *data, std::size_t length) {
   siftDown(data, 0);
   return data[length];
 }
-}  // namespace SIMD_MEDIAN
+} // namespace SIMD_MEDIAN
 
 union alignas(64) ParentHolder {
   __m256i reg;
@@ -60,7 +61,7 @@ union alignas(64) ParentHolder {
 
   // Explicit copy constructor
   ParentHolder(const ParentHolder &other) {
-    reg = other.reg;  // Safe to copy the `__m256i` type directly
+    reg = other.reg; // Safe to copy the `__m256i` type directly
   }
 
   // Explicit assignment operator
@@ -76,7 +77,8 @@ union alignas(64) ParentHolder {
   const uint32_t &operator[](std::size_t idx) const { return values[idx]; }
 
   void print() {
-    for (int i = 0; i < 8; ++i) std::cout << values[i] << ", ";
+    for (int i = 0; i < 8; ++i)
+      std::cout << values[i] << ", ";
     std::cout << std::endl;
   }
 
@@ -144,8 +146,7 @@ union alignas(64) ParentHolder {
   }
 };
 
-template <int K = 16>
-struct TreeSampler {
+template <int K = 16> struct TreeSampler {
   std::array<const Graph *, 2> graphs;
   std::size_t numNodes;
   std::array<std::vector<ParentHolder>, 2> parents;
@@ -155,8 +156,7 @@ struct TreeSampler {
 
   TreeSampler(const Graph &fwdGraph, const Graph &bwdGraph,
               std::vector<Vertex> &topoOrder)
-      : graphs{&fwdGraph, &bwdGraph},
-        numNodes(fwdGraph.numVertices()),
+      : graphs{&fwdGraph, &bwdGraph}, numNodes(fwdGraph.numVertices()),
         parents{std::vector<ParentHolder>(numNodes + 1),
                 std::vector<ParentHolder>(numNodes + 1)},
         descendants{std::vector<ParentHolder>(numNodes + 1),
@@ -289,8 +289,8 @@ struct TreeSampler {
               mask * (1 + currentDescendants[BWD][v][t]);
         }
 
-        descendants[FWD][v] = descendants[FWD][v] + currentDescendants[FWD][v];
-        currentDescendants[FWD][v].fill(0);
+        descendants[BWD][v] = descendants[BWD][v] + currentDescendants[BWD][v];
+        currentDescendants[BWD][v].fill(0);
       }
     };
 

@@ -28,26 +28,22 @@
 #include "hub_labels.h"
 #include "status_log.h"
 
-template <class LABEL = Label>
-struct PLL {
- public:
+template <class LABEL = Label> struct PLL {
+public:
   std::array<std::vector<LABEL>, 2> &labels;
   std::array<std::vector<uint8_t>, 2> &lookup;
   std::vector<uint8_t> &alreadyProcessed;
   std::array<const Graph *, 2> &graph;
-  std::array<bfs::ParallelBFS, 2> bfs;
-  /* std::array<bfs::BFS, 2> bfs; */
+  /* std::array<bfs::ParallelBFS, 2> bfs; */
+  std::array<bfs::BFS, 2> bfs;
 
   PLL(std::array<std::vector<LABEL>, 2> &labels,
       std::array<std::vector<uint8_t>, 2> &lookup,
       std::vector<uint8_t> &alreadyProcessed,
       std::array<const Graph *, 2> &graph)
-      : labels(labels),
-        lookup(lookup),
-        alreadyProcessed(alreadyProcessed),
-        graph(graph),
-        /* bfs{bfs::BFS(*graph[FWD]), bfs::BFS(*graph[BWD])} {}; */
-        bfs{bfs::ParallelBFS(*graph[FWD]), bfs::ParallelBFS(*graph[BWD])} {};
+      : labels(labels), lookup(lookup), alreadyProcessed(alreadyProcessed),
+        graph(graph), bfs{bfs::BFS(*graph[FWD]), bfs::BFS(*graph[BWD])} {};
+  /* bfs{bfs::ParallelBFS(*graph[FWD]), bfs::ParallelBFS(*graph[BWD])} {}; */
 
   void run(const std::vector<Vertex> &ordering) {
     StatusLog log("Computing HLs");
@@ -76,34 +72,34 @@ struct PLL {
     bfs[BWD].reset(numVertices);
   }
 
-  void runPrunedBFS(const Vertex v, const int numThreads = 1) {
+  void runPrunedBFS(const Vertex v, const int /*numThreads = 1*/) {
     assert(v < labels[BWD].size());
 
     modifyLookups(v, true);
 
     auto runOneDirection = [&](const DIRECTION dir) -> void {
-      bfs[dir].run(
-          v, bfs::noOp,
-          [&](const Vertex w) {
-            bool prune = (alreadyProcessed[w] ||
-                          labels[!dir][w].appliesToAny(
-                              [&](const Vertex h) { return lookup[dir][h]; }));
-            return prune;
-          },
-          numThreads);
+      bfs[dir].run(v, bfs::noOp, [&](const Vertex w) {
+        bool prune = (alreadyProcessed[w] ||
+                      labels[!dir][w].appliesToAny(
+                          [&](const Vertex h) { return lookup[dir][h]; }));
+        return prune;
+      });
     };
 
-    /* #pragma omp parallel for num_threads(2) */
+#pragma omp parallel for num_threads(2)
     for (auto dir : {FWD, BWD}) {
       runOneDirection(dir);
     }
 
-#pragma omp parallel for num_threads(2)
+    /* #pragma omp parallel for num_threads(2) */
     for (auto dir : {FWD, BWD}) {
+      std::cout << ((dir == FWD) ? "Forward" : "Backward") << ":" << std::endl;
       bfs[dir].doForAllVerticesInQ([&](const Vertex u) {
+        std::cout << u << " ";
         assert(!labels[!dir][u].contains(v));
         labels[!dir][u].add(v);
       });
+      std::cout << std::endl;
     }
 
     alreadyProcessed[v] = true;

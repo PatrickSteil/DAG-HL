@@ -5,53 +5,64 @@
 
 #pragma once
 
+#include <array>
 #include <cmath>
 #include <functional>
 #include <iostream>
+#include <queue>
+#include <random>
 #include <vector>
 
 #include "graph.h"
 
 struct TopologicalSeperator {
-  const Graph &graph;
+  std::array<const Graph *, 2> graphs;
   const std::vector<Vertex> &topoOrder;
 
-  TopologicalSeperator(const Graph &graph, const std::vector<Vertex> &topoOrder)
-      : graph(graph), topoOrder(topoOrder){};
+  TopologicalSeperator(const Graph &fwd, const Graph &bwd,
+                       const std::vector<Vertex> &topoOrder)
+      : graphs{&fwd, &bwd}, topoOrder(topoOrder){};
 
   std::vector<Vertex> run(const double imbalance) {
     assert(imbalance >= 0);
     assert(imbalance <= 1);
 
-    std::function<void(std::vector<Vertex> &, std::size_t, std::size_t)>
-        orderRecursive;
-    orderRecursive = [&](std::vector<Vertex> &result, std::size_t start,
-                         std::size_t end) {
-      if (start >= end) return;
+    std::queue<std::pair<std::size_t, std::size_t>> ranges;
+    ranges.push({0, topoOrder.size()});
+
+    std::vector<Vertex> result;
+    result.reserve(topoOrder.size());
+
+    auto rng = std::default_random_engine{};
+    while (!ranges.empty()) {
+      auto [start, end] = ranges.front();
+      ranges.pop();
+
+      if (start >= end) continue;
 
       std::size_t totalSize = end - start;
       std::size_t leftSize =
           static_cast<std::size_t>((totalSize / 2.0) * (1.0 - imbalance));
-      std::size_t rightSize = totalSize - leftSize;
+      std::size_t rightSize = end - leftSize;
 
       std::size_t leftBound = start + leftSize;
-      std::size_t rightBound = start + leftSize + rightSize;
+      std::size_t rightBound = rightSize;
 
       std::vector<Vertex> middleVertices(topoOrder.begin() + leftBound,
                                          topoOrder.begin() + rightBound);
-      std::sort(middleVertices.begin(), middleVertices.end(),
-                [&](Vertex a, Vertex b) {
-                  return graph.degree(a) > graph.degree(b);
-                });
 
+      std::ranges::shuffle(middleVertices, rng);
+      /* std::sort(middleVertices.begin(), middleVertices.end(), */
+      /*           [&](Vertex a, Vertex b) { */
+      /*             return graphs[FWD]->degree(a) + graphs[BWD]->degree(a) > */
+      /*                    graphs[FWD]->degree(b) + graphs[BWD]->degree(b); */
+      /*           }); */
       result.insert(result.end(), middleVertices.begin(), middleVertices.end());
 
-      orderRecursive(result, start, leftBound);
-      orderRecursive(result, rightBound, end);
+      ranges.push({start, leftBound});
+      ranges.push({rightBound, end});
     };
 
-    std::vector<Vertex> result;
-    orderRecursive(result, 0, topoOrder.size());
     return result;
   }
 };

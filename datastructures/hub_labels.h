@@ -28,8 +28,6 @@
 #include "types.h"
 #include "utils.h"
 
-enum DIRECTION : bool { FWD, BWD };
-
 struct Label {
   Label(){};
 
@@ -57,8 +55,7 @@ struct Label {
   const Vertex &operator[](std::size_t i) const { return nodes[i]; }
 
   // toVerfiy should take (const Vertex h) as argument
-  template <typename FUNC>
-  bool appliesToAny(FUNC &&toVerfiy) {
+  template <typename FUNC> bool appliesToAny(FUNC &&toVerfiy) {
     return std::any_of(nodes.begin(), nodes.end(), toVerfiy);
   }
 
@@ -83,7 +80,8 @@ struct Label {
   void sort() { std::sort(nodes.begin(), nodes.end()); }
 
   void setDeltaRepresentation() {
-    if (nodes.empty()) return;
+    if (nodes.empty())
+      return;
 
     std::vector<Vertex> new_nodes;
     new_nodes.reserve(nodes.size());
@@ -139,8 +137,7 @@ struct LabelThreadSafe {
     return nodes[i];
   }
 
-  template <typename FUNC>
-  bool appliesToAny(FUNC &&toVerify) {
+  template <typename FUNC> bool appliesToAny(FUNC &&toVerify) {
     std::lock_guard<std::mutex> lock(mutex_);
     return std::any_of(nodes.begin(), nodes.end(), toVerify);
   }
@@ -180,7 +177,8 @@ struct LabelThreadSafe {
 
   void setDeltaRepresentation() {
     std::lock_guard<std::mutex> lock(mutex_);
-    if (nodes.empty()) return;
+    if (nodes.empty())
+      return;
 
     std::vector<Vertex> new_nodes;
     new_nodes.reserve(nodes.size());
@@ -212,7 +210,8 @@ bool query(std::array<std::vector<LABEL>, 2> &labels, const Vertex from,
   const auto &toLabels = labels[BWD][to];
 
   while (i < fromLabels.size() && j < toLabels.size()) {
-    if (fromLabels[i] == toLabels[j]) return true;
+    if (fromLabels[i] == toLabels[j])
+      return true;
 
     if (fromLabels[i] < toLabels[j]) {
       i++;
@@ -271,13 +270,13 @@ void saveToFile(std::array<std::vector<LABEL>, 2> &labels,
   std::size_t N = labels[FWD].size();
 
   for (std::size_t v = 0; v < N; ++v) {
-    outFile << "o";
+    outFile << "o " << v;
     for (const Vertex hub : labels[FWD][v].nodes) {
       outFile << " " << hub;
     }
     outFile << "\n";
 
-    outFile << "i";
+    outFile << "i " << v;
     for (const Vertex hub : labels[BWD][v].nodes) {
       outFile << " " << hub;
     }
@@ -346,8 +345,8 @@ void readFromFile(std::array<std::vector<LABEL>, 2> &labels,
 }
 
 template <class LABEL = Label>
-std::vector<Vertex> computePermutation(
-    const std::array<std::vector<LABEL>, 2> &labels) {
+std::vector<Vertex>
+computePermutation(const std::array<std::vector<LABEL>, 2> &labels) {
   StatusLog log("Compute Hub permutation");
   const std::size_t numVertices = labels[0].size();
 

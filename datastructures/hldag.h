@@ -37,9 +37,8 @@
 #include "topological_sort.h"
 #include "utils.h"
 
-template <class LABEL = Label>
-struct HLDAG {
- public:
+template <class LABEL = Label> struct HLDAG {
+public:
   std::array<std::vector<LABEL>, 2> labels;
 
   std::vector<uint8_t> alreadyProcessed;
@@ -50,8 +49,7 @@ struct HLDAG {
   PLL<LABEL> pll;
 
   HLDAG(const Graph &fwdGraph, const Graph &bwdGraph)
-      : labels{std::vector<LABEL>(), std::vector<LABEL>()},
-        alreadyProcessed(),
+      : labels{std::vector<LABEL>(), std::vector<LABEL>()}, alreadyProcessed(),
         graph{&fwdGraph, &bwdGraph},
         lookup{std::vector<uint8_t>(), std::vector<uint8_t>()},
         pll(labels, lookup, alreadyProcessed, graph) {
@@ -62,8 +60,6 @@ struct HLDAG {
     StatusLog log("Computing HLs");
     assert(graph[FWD]->numVertices() == graph[BWD]->numVertices());
     assert(graph[FWD]->numEdges() == graph[BWD]->numEdges());
-    assert(labels[FWD].size() == graph[BWD]->numVertices());
-    assert(labels[BWD].size() == graph[BWD]->numVertices());
 
     const std::size_t numVertices = graph[FWD]->numVertices();
 
@@ -72,13 +68,8 @@ struct HLDAG {
     assert(ordering.size() == numVertices);
     assert(isOrdering(ordering, numVertices));
 
-    std::size_t i = 0;
-
-    for (; i < numVertices / 4; ++i) {
+    for (std::size_t i; i < numVertices; ++i) {
       pll.runPrunedBFS(ordering[i], numThreads);
-    }
-    for (; i < numVertices; ++i) {
-      pll.runPrunedBFS(ordering[i], 1);
     }
   }
 
@@ -141,9 +132,11 @@ struct HLDAG {
   void print() const {
     for (std::size_t v = 0; v < graph[FWD]->numVertices(); ++v) {
       std::cout << " -> " << v << "\n\t";
-      for (auto h : labels[FWD][v].nodes) std::cout << h << " ";
+      for (auto h : labels[FWD][v].nodes)
+        std::cout << h << " ";
       std::cout << "\n <- " << v << "\n\t";
-      for (auto h : labels[BWD][v].nodes) std::cout << h << " ";
+      for (auto h : labels[BWD][v].nodes)
+        std::cout << h << " ";
       std::cout << std::endl;
     }
   }
@@ -164,12 +157,12 @@ struct HLDAG {
       std::shuffle(randomNumber.begin(), randomNumber.end(), g);
 
       auto degreeCompRandom = [&](const auto left, const auto right) {
-        return std::forward_as_tuple(
-                   graph[FWD]->degree(left) + graph[BWD]->degree(left),
-                   randomNumber[left]) >
-               std::forward_as_tuple(
-                   graph[FWD]->degree(right) + graph[BWD]->degree(right),
-                   randomNumber[right]);
+        return std::forward_as_tuple(graph[FWD]->degree(left) +
+                                         graph[BWD]->degree(left),
+                                     randomNumber[left]) >
+               std::forward_as_tuple(graph[FWD]->degree(right) +
+                                         graph[BWD]->degree(right),
+                                     randomNumber[right]);
       };
 
       std::iota(ordering.begin(), ordering.end(), 0);

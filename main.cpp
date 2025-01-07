@@ -10,6 +10,7 @@
 #include "datastructures/hldag.h"
 #include "datastructures/hub_labels.h"
 #include "datastructures/sample_trees_simd.h"
+#include "datastructures/topological_seperator.h"
 #include "external/cmdparser.hpp"
 
 void configure_parser(cli::Parser &parser) {
@@ -60,34 +61,30 @@ int main(int argc, char *argv[]) {
 
   Graph rev = g.reverseGraph();
 
-  //// TEST
-  std::vector<bool> prune(g.numVertices(), false);
-  TopologicalSort sorter(g);
-  TreeSampler<> sampler(g, rev, sorter.ordering);
+  /* std::vector<bool> prune(g.numVertices(), false); */
+  /* Drawer<Vertex> drawer; */
+  /* std::vector<Vertex> allVertices; */
+  /* parallel_assign_iota(allVertices, g.numVertices(), Vertex(0)); */
+  /* drawer.init(allVertices); */
 
-  Drawer<Vertex> drawer;
-  std::vector<Vertex> allVertices;
-  parallel_assign_iota(allVertices, g.numVertices(), Vertex(0));
-  drawer.init(allVertices);
+  /* std::vector<Vertex> sources; */
+  /* for (int i = 0; i < 8; ++i) { */
+  /*   sources.emplace_back(drawer.pickRandom()); */
+  /* } */
 
-  std::vector<Vertex> sources;
-  for (int i = 0; i < 8; ++i) {
-    sources.emplace_back(drawer.pickRandom());
-  }
+  /* sampler.computeParents(sources, prune); */
+  /* sampler.computeDescendants(); */
 
-  sampler.computeParents(sources, prune);
-  sampler.computeDescendants();
+  /* std::size_t counter = 0; */
 
-  std::size_t counter = 0;
+  /* for (Vertex v = 0; v < g.numVertices(); ++v) { */
+  /*   counter += (sampler.totalDescendants(v) > 0); */
+  /* } */
+  /* std::cout << "Counter: " << counter << std::endl; */
+  /* return 0; */
 
-  for (Vertex v = 0; v < g.numVertices(); ++v) {
-    counter += (sampler.totalDescendants(v) > 0);
-  }
-  std::cout << "Counter: " << counter << std::endl;
-
-  return 0;
-  /* HLDAG<Label> hl(g, rev); */
-  HLDAG<LabelThreadSafe> hl(g, rev);
+  HLDAG<Label> hl(g, rev);
+  /* HLDAG<LabelThreadSafe> hl(g, rev); */
 
   hl.run(orderingFile, numThreads);
 
@@ -103,9 +100,11 @@ int main(int argc, char *argv[]) {
 
   sortLabels(hl.labels);
 
-  if (showStats) hl.showStats();
+  if (showStats)
+    hl.showStats();
 
-  if (outputFileName != "") saveToFile(hl.labels, outputFileName);
+  if (outputFileName != "")
+    saveToFile(hl.labels, outputFileName);
 
   if (run_benchmark) {
     query_benchmark(hl.labels, 10000);

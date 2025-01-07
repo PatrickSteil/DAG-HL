@@ -16,9 +16,8 @@
 #include "utils.h"
 
 namespace bfs {
-template <typename VertexType = std::uint64_t>
-class FixedSizedQueue {
- public:
+template <typename VertexType = std::uint64_t> class FixedSizedQueue {
+public:
   explicit FixedSizedQueue(std::size_t size = 0)
       : data(size), read(0), write(0) {}
 
@@ -47,126 +46,49 @@ class FixedSizedQueue {
   std::size_t write;
 };
 
-template <typename VertexType = std::uint64_t>
-class FixedSizedQueueThreadSafe {
- public:
+template <typename VertexType = std::uint64_t> class FixedSizedQueueThreadSafe {
+public:
   explicit FixedSizedQueueThreadSafe(std::size_t size = 0)
       : data(size), read(0), write(0) {}
 
+  // this should be done thread safely
   void resize(std::size_t size) {
-    std::lock(mutex_read, mutex_write);
-
-    std::lock_guard<std::mutex> lock_read(mutex_read, std::adopt_lock);
-    std::lock_guard<std::mutex> lock_write(mutex_write, std::adopt_lock);
-
     data.resize(size);
-    read = 0;
-    write = 0;
+    read.store(0);
+    write.store(0);
+    ;
   }
 
   void push(VertexType v) {
-    std::lock_guard<std::mutex> lock(mutex_write);
-    assert(write < data.size());
-    data[write++] = v;
+    assert(write.load() < data.size());
+    auto index = write.fetch_add(1);
+    data[index] = v;
   }
 
   VertexType pop() {
-    std::lock(mutex_read, mutex_write);
-    std::lock_guard<std::mutex> lock_read(mutex_read, std::adopt_lock);
-    std::lock_guard<std::mutex> lock_write(mutex_write, std::adopt_lock);
-
-    if (read == write) [[unlikely]] {
+    if (isEmpty()) [[unlikely]] {
       return static_cast<VertexType>(-1);
     }
-    /* assert(read < write); */
-    return data[read++];
+    auto index = read.fetch_add(1);
+    return data[index];
   }
 
-  bool isEmpty() const {
-    std::lock(mutex_read, mutex_write);
-    std::lock_guard<std::mutex> lock_read(mutex_read, std::adopt_lock);
-    std::lock_guard<std::mutex> lock_write(mutex_write, std::adopt_lock);
-
-    return read == write;
-  }
+  bool isEmpty() const { return read.load() == write.load(); }
 
   void reset() {
-    std::lock(mutex_read, mutex_write);
-    std::lock_guard<std::mutex> lock_read(mutex_read, std::adopt_lock);
-    std::lock_guard<std::mutex> lock_write(mutex_write, std::adopt_lock);
-
-    read = 0;
-    write = 0;
+    read.store(0);
+    write.store(0);
   }
 
-  mutable std::mutex mutex_read;
-  mutable std::mutex mutex_write;
   std::vector<VertexType> data;
-  std::size_t read;
-  std::size_t write;
-};
-
-// From exersice 4
-template <class T>
-class ConcurrentQueue {
-  static_assert(std::is_default_constructible<T>::value,
-                "T must be default constructible.");
-
- public:
-  explicit ConcurrentQueue(std::size_t capacity)
-      : capacity_(capacity),
-        data_(std::make_unique<AlignedData<T>[]>(capacity)),
-        read_(0),
-        write_(0) {}
-
-  bool try_push(const T &value) {
-    assert(value != T{});
-
-    std::size_t write_index = write_.load(std::memory_order_relaxed);
-    std::size_t next_write_index = (write_index + 1) % capacity_;
-
-    if (next_write_index == read_.load(std::memory_order_acquire)) {
-      return false;
-    }
-
-    data_[write_index]().store(value, std::memory_order_release);
-    write_.store(next_write_index, std::memory_order_release);
-    return true;
-  }
-
-  bool try_pop(T &value) {
-    std::size_t read_index = read_.load(std::memory_order_relaxed);
-
-    if (read_index == write_.load(std::memory_order_acquire)) {
-      return false;
-    }
-
-    value = data_[read_index]().load(std::memory_order_acquire);
-    data_[read_index]().store(T{}, std::memory_order_release);
-    read_.store((read_index + 1) % capacity_, std::memory_order_release);
-    return true;
-  }
-
- private:
-  template <typename L>
-  struct alignas(64) AlignedData {
-    std::atomic<L> data;
-
-    std::atomic<L> &operator()() { return data; }
-
-    const std::atomic<L> &operator()() const { return data; }
-  };
-
-  const std::size_t capacity_;
-  std::unique_ptr<AlignedData<T>[]> data_;
-  std::atomic<std::size_t> read_;
-  std::atomic<std::size_t> write_;
+  std::atomic_size_t read;
+  std::atomic_size_t write;
 };
 
 // class that handles whether we have already seen a vertex
 template <std::integral GenerationType = std::uint16_t>
 class GenerationChecker {
- public:
+public:
   explicit GenerationChecker(std::size_t size = 0)
       : seen(size, 0), generation(1) {}
 
@@ -201,7 +123,7 @@ class GenerationChecker {
 
 template <std::integral GenerationType = std::uint16_t>
 class GenerationCheckerThreadSafe {
- public:
+public:
   explicit GenerationCheckerThreadSafe(std::size_t size = 0)
       : seen(size, 0), generation(1) {}
 
@@ -243,9 +165,9 @@ class GenerationCheckerThreadSafe {
     return overwrite;
   }
 
- private:
+private:
   mutable std::mutex mutex;
   std::vector<GenerationType> seen;
   GenerationType generation;
 };
-}  // namespace bfs
+} // namespace bfs
