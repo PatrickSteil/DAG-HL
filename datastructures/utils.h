@@ -8,11 +8,29 @@
 #include <omp.h>
 
 #include <algorithm>
+#include <bit>
+#include <bitset>
 #include <concepts>
 #include <iostream>
+#include <limits>
 #include <numeric>
 #include <random>
 #include <vector>
+
+template <std::size_t N>
+std::size_t findFirstOne(const std::bitset<N> &bs) {
+  static_assert(N % 64 == 0, "Bitset size must be a multiple of 64");
+  constexpr std::size_t chunkSize = 64;
+  constexpr std::size_t numChunks = N / chunkSize;
+
+  for (std::size_t i = 0; i < numChunks; ++i) {
+    uint64_t chunk = (bs >> (i * chunkSize)).to_ullong();
+    if (chunk != 0) {
+      return (i * chunkSize + std::countr_zero(chunk));
+    }
+  }
+  return N + 1;
+}
 
 template <typename T>
 void parallel_fill(std::vector<T> &v, const T &value) {

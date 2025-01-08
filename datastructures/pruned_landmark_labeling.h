@@ -27,22 +27,26 @@
 #include "graph.h"
 #include "hub_labels.h"
 #include "status_log.h"
+#include "utils.h"
 
-template <class LABEL = Label>
+template <int WIDTH = 256, class LABEL = Label>
 struct PLL {
  public:
   std::array<std::vector<LABEL>, 2> &labels;
   std::array<std::vector<uint8_t>, 2> &lookup;
+  std::array<std::vector<std::bitset<WIDTH>>, 2> &reachability;
   std::vector<uint8_t> &alreadyProcessed;
   std::array<const Graph *, 2> &graph;
   std::array<bfs::BFS, 2> bfs;
 
   PLL(std::array<std::vector<LABEL>, 2> &labels,
       std::array<std::vector<uint8_t>, 2> &lookup,
+      std::array<std::vector<std::bitset<WIDTH>>, 2> &reachability,
       std::vector<uint8_t> &alreadyProcessed,
       std::array<const Graph *, 2> &graph)
       : labels(labels),
         lookup(lookup),
+        reachability(reachability),
         alreadyProcessed(alreadyProcessed),
         graph(graph),
         bfs{bfs::BFS(*graph[FWD]), bfs::BFS(*graph[BWD])} {};
@@ -72,6 +76,51 @@ struct PLL {
 
     bfs[FWD].reset(numVertices);
     bfs[BWD].reset(numVertices);
+  }
+
+  template <bool PRUNE_VIA_BITSET = true>
+  void runPrunedBFS(const std::size_t left, const std::size_t i,
+                    const std::vector<Vertex> &ordering) {
+    assert(left + i < ordering.size());
+    assert(i < WIDTH);
+
+    const Vertex v = ordering[left + i];
+    modifyLookups(v, true);
+
+    auto runOneDirection = [&](const DIRECTION dir) -> void {
+      bfs[dir].run(v, bfs::noOp, [&](const Vertex w) {
+        bool prune = alreadyProcessed[w] ||
+                     labels[!dir][w].appliesToAny(
+                         [&](const Vertex h) { return lookup[dir][h]; });
+
+        if constexpr (PRUNE_VIA_BITSET) {
+          assert(reachability[dir][w].any());
+          assert(reachability[!dir][v].any());
+
+          auto result =
+              findFirstOne(reachability[dir][w] & reachability[!dir][v]);
+
+          prune |= (result < i);
+        }
+        return prune;
+      });
+    };
+
+#pragma omp parallel for num_threads(2)
+    for (auto dir : {FWD, BWD}) {
+      runOneDirection(dir);
+    }
+
+#pragma omp parallel for num_threads(2)
+    for (auto dir : {FWD, BWD}) {
+      bfs[dir].doForAllVerticesInQ([&](const Vertex u) {
+        assert(!labels[!dir][u].contains(v));
+        labels[!dir][u].add(v);
+      });
+    }
+
+    alreadyProcessed[v] = true;
+    modifyLookups(v, false);
   }
 
   void runPrunedBFS(const Vertex v) {

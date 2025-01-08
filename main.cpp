@@ -25,7 +25,7 @@ void configure_parser(cli::Parser &parser) {
   parser.set_optional<bool>("s", "show_stats", false,
                             "Show statistics about the computed hub labels.");
   parser.set_optional<bool>("c", "compress_labels", false,
-                            "Reorders hubs, and computes Delta compression");
+                            "Reorders hubs by frequency");
   parser.set_optional<bool>("b", "benchmark_queries", false,
                             "Runs a small (10.000) query benchmark");
 };
@@ -44,6 +44,8 @@ int main(int argc, char *argv[]) {
   const auto compress = parser.get<bool>("c");
   const auto run_benchmark = parser.get<bool>("b");
 
+  const int K = 64;
+
   if (numThreads <= 0) {
     std::cout << "Number of threads should be greater than 0!" << std::endl;
     return -1;
@@ -59,7 +61,7 @@ int main(int argc, char *argv[]) {
 
   Graph rev = g.reverseGraph();
 
-  HLDAG<LabelThreadSafe> hl(g, rev);
+  HLDAG<K, LabelThreadSafe> hl(g, rev);
 
   hl.run(orderingFile);
 

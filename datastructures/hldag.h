@@ -37,7 +37,7 @@
 #include "topological_sort.h"
 #include "utils.h"
 
-template <class LABEL = Label>
+template <int WIDTH = 256, class LABEL = Label>
 struct HLDAG {
  public:
   std::array<std::vector<LABEL>, 2> labels;
@@ -45,16 +45,22 @@ struct HLDAG {
   std::vector<uint8_t> alreadyProcessed;
   std::array<const Graph *, 2> graph;
 
-  std::array<std::vector<uint8_t>, 2> lookup;
+  std::vector<Edge> edges;
 
-  PLL<LABEL> pll;
+  std::array<std::vector<uint8_t>, 2> lookup;
+  std::array<std::vector<std::bitset<WIDTH>>, 2> reachability;
+
+  PLL<WIDTH, LABEL> pll;
 
   HLDAG(const Graph &fwdGraph, const Graph &bwdGraph)
       : labels{std::vector<LABEL>(), std::vector<LABEL>()},
         alreadyProcessed(),
         graph{&fwdGraph, &bwdGraph},
+        edges(),
         lookup{std::vector<uint8_t>(), std::vector<uint8_t>()},
-        pll(labels, lookup, alreadyProcessed, graph) {
+        reachability{std::vector<std::bitset<WIDTH>>(),
+                     std::vector<std::bitset<WIDTH>>()},
+        pll(labels, lookup, reachability, alreadyProcessed, graph) {
     init(fwdGraph.numVertices());
   };
 
@@ -70,9 +76,49 @@ struct HLDAG {
     assert(ordering.size() == numVertices);
     assert(isOrdering(ordering, numVertices));
 
-    for (std::size_t i; i < numVertices; ++i) {
+    std::size_t i = 0;
+
+    for (; i + WIDTH < numVertices; i += WIDTH) {
+      runSweep(i, ordering);
+
+      for (std::size_t j = 0; j < WIDTH; ++j) {
+        pll.runPrunedBFS(i, j, ordering);
+      }
+    }
+
+    for (; i < numVertices; ++i) {
       pll.runPrunedBFS(ordering[i]);
     }
+  }
+
+  void runSweep(const std::size_t left, const std::vector<Vertex> &ordering) {
+    /* assert(left + WIDTH < ordering.size()); */
+    resetReachability();
+
+    for (int i = 0;
+         i < std::min(WIDTH, static_cast<int>(ordering.size() - left)); ++i) {
+      const auto vertex = ordering[left + i];
+
+      reachability[FWD][vertex][i] = 1;
+      reachability[BWD][vertex][i] = 1;
+    }
+
+    auto fwdSweep = [&]() -> void {
+      for (std::size_t i = 0; i < edges.size(); ++i) {
+        const auto &edge = edges[i];
+        reachability[FWD][edge.to] |= reachability[FWD][edge.from];
+      }
+    };
+
+    auto bwdSweep = [&]() -> void {
+      for (std::size_t i = edges.size(); i-- > 0;) {
+        const auto &edge = edges[i];
+        reachability[BWD][edge.from] |= reachability[BWD][edge.to];
+      }
+    };
+
+    fwdSweep();
+    bwdSweep();
   }
 
   std::size_t computeTotalBytes() const {
@@ -152,8 +198,7 @@ struct HLDAG {
       parallel_assign_iota(randomNumber, graph[FWD]->numVertices(),
                            static_cast<std::size_t>(0));
 
-      std::random_device rd;
-      std::mt19937 g(rd());
+      std::mt19937 g(42);
 
       std::shuffle(randomNumber.begin(), randomNumber.end(), g);
 
@@ -190,32 +235,6 @@ struct HLDAG {
     return ordering;
   }
 
-  std::vector<Vertex> getOrderingDegTopo() {
-    std::vector<Vertex> ordering(graph[FWD]->numVertices(), 0);
-
-    TopologicalSort sorter(*graph[FWD]);
-    std::vector<std::size_t> topoRank(graph[FWD]->numVertices(), 0);
-
-    for (std::size_t i = 0; i < sorter.ordering.size(); ++i) {
-      topoRank[sorter.ordering[i]] = i;
-    }
-
-    std::iota(ordering.begin(), ordering.end(), 0);
-
-    auto rank = [&](auto v) -> double {
-      double centrality = 1 - abs((topoRank[v] / topoRank.size()) - 0.5);
-      return 0.5 * (graph[FWD]->degree(v) + graph[BWD]->degree(v)) +
-             1000 * centrality;
-    };
-
-    std::sort(ordering.begin(), ordering.end(),
-              [&](const auto left, const auto right) {
-                return rank(left) > rank(right);
-              });
-
-    return ordering;
-  }
-
   bool isOrdering(const std::vector<Vertex> &ordering,
                   const std::size_t numVertices) {
     std::set<Vertex> orderedSet(ordering.begin(), ordering.end());
@@ -246,6 +265,37 @@ struct HLDAG {
 
     parallel_assign(lookup[BWD], numVertices, uint8_t(0));
     parallel_assign(lookup[FWD], numVertices, uint8_t(0));
+
+    // fill edges
+    TopologicalSort sorter(*graph[FWD]);
+    std::vector<std::size_t> rank;
+    parallel_assign(rank, numVertices, std::size_t(0));
+
+    for (std::size_t i = 0; i < numVertices; ++i) {
+      rank[sorter.getOrdering()[i]] = i;
+    }
+
+    edges.reserve(graph[FWD]->numEdges());
+
+    for (Vertex from = 0; from < numVertices; ++from) {
+      for (std::size_t i = graph[FWD]->beginEdge(from);
+           i < graph[FWD]->endEdge(from); ++i) {
+        edges.emplace_back(from, graph[FWD]->toVertex[i]);
+      }
+    }
+
+    std::sort(edges.begin(), edges.end(),
+              [&](const auto &left, const auto &right) {
+                return std::tie(rank[left.from], rank[left.to]) <
+                       std::tie(rank[right.from], rank[right.to]);
+              });
+  }
+
+  void resetReachability() {
+    parallel_assign(reachability[BWD], graph[FWD]->numVertices(),
+                    std::bitset<WIDTH>());
+    parallel_assign(reachability[FWD], graph[FWD]->numVertices(),
+                    std::bitset<WIDTH>());
   }
 
   void modifyLookups(const Vertex v, bool value) {
