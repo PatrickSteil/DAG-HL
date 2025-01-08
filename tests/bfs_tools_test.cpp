@@ -54,7 +54,7 @@ TEST(GenerationCheckerThreadSafeTest, SequentialMarking) {
   std::vector<std::size_t> q(SIZE, 0);
 
   for (std::size_t i = 0; i < SIZE; ++i) {
-    if (checker.tryMark(i)) {
+    if (checker.firstOccur(i)) {
       q[i] = i;
     }
   }
@@ -70,7 +70,7 @@ TEST(GenerationCheckerThreadSafeTest, ConcurrentMarking) {
   std::vector<std::size_t> q(SIZE, 0);
   auto worker = [&](std::size_t thread_id) {
     for (std::size_t i = thread_id; i < SIZE; ++i) {
-      if (checker.tryMark(i)) {
+      if (checker.firstOccur(i)) {
         q[i] = i;
       }
     }

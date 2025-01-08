@@ -51,33 +51,37 @@ public:
   explicit FixedSizedQueueThreadSafe(std::size_t size = 0)
       : data(size), read(0), write(0) {}
 
-  // this should be done thread safely
+  // Resize the queue safely (not thread-safe in this version)
   void resize(std::size_t size) {
     data.resize(size);
-    read.store(0);
-    write.store(0);
-    ;
+    read.store(0, std::memory_order_relaxed);
+    write.store(0, std::memory_order_relaxed);
   }
 
   void push(VertexType v) {
-    assert(write.load() < data.size());
-    auto index = write.fetch_add(1);
+    auto index = write.fetch_add(1, std::memory_order_relaxed);
+    assert(index < data.size()); // Ensure no overflows
     data[index] = v;
   }
 
   VertexType pop() {
-    if (isEmpty()) [[unlikely]] {
-      return static_cast<VertexType>(-1);
+    auto current_read = read.load(std::memory_order_relaxed);
+    if (current_read >= write.load(std::memory_order_acquire)) {
+      return static_cast<VertexType>(-1); // Queue empty
     }
-    auto index = read.fetch_add(1);
+    auto index = read.fetch_add(1, std::memory_order_relaxed);
+    assert(index < data.size()); // Ensure valid access
     return data[index];
   }
 
-  bool isEmpty() const { return read.load() == write.load(); }
+  bool isEmpty() const {
+    return read.load(std::memory_order_acquire) ==
+           write.load(std::memory_order_acquire);
+  }
 
   void reset() {
-    read.store(0);
-    write.store(0);
+    read.store(0, std::memory_order_relaxed);
+    write.store(0, std::memory_order_relaxed);
   }
 
   std::vector<VertexType> data;
@@ -115,6 +119,12 @@ public:
   inline void mark(std::size_t i) {
     assert(isValid(i));
     seen[i] = generation;
+  }
+
+  bool firstOccur(std::size_t i) {
+    bool seenBefore = (seen[i] == generation);
+    seen[i] = generation;
+    return !seenBefore;
   }
 
   std::vector<GenerationType> seen;
@@ -156,13 +166,11 @@ public:
     seen[i] = generation;
   }
 
-  bool tryMark(std::size_t i) {
+  bool firstOccur(std::size_t i) {
     std::lock_guard<std::mutex> lock(mutex);
-    assert(isValid(i));
-
-    bool overwrite = (seen[i] != generation);
-    seen[i] = (overwrite ? generation : seen[i]);
-    return overwrite;
+    bool seenBefore = (seen[i] == generation);
+    seen[i] = generation;
+    return !seenBefore;
   }
 
 private:

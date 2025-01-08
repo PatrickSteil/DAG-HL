@@ -68,8 +68,13 @@ public:
     assert(ordering.size() == numVertices);
     assert(isOrdering(ordering, numVertices));
 
-    for (std::size_t i; i < numVertices; ++i) {
+    std::size_t i = 0;
+    for (; i < (numVertices >> 3); ++i) {
       pll.runPrunedBFS(ordering[i], numThreads);
+    }
+
+    for (; i < numVertices; ++i) {
+      pll.runPrunedBFS(ordering[i], 1);
     }
   }
 
