@@ -17,23 +17,32 @@
 #include <random>
 #include <vector>
 
+template <std::size_t N> void *getUnderlyingPointer(std::bitset<N> &bs) {
+  return reinterpret_cast<void *>(&bs);
+}
+
 template <std::size_t N>
-std::size_t findFirstOne(const std::bitset<N> &bs) {
+std::size_t findFirstOne(std::bitset<N> &left, std::bitset<N> &right) {
   static_assert(N % 64 == 0, "Bitset size must be a multiple of 64");
   constexpr std::size_t chunkSize = 64;
   constexpr std::size_t numChunks = N / chunkSize;
 
+  void *ptrLeft = getUnderlyingPointer(left);
+  void *ptrRight = getUnderlyingPointer(right);
+
+  uint64_t *chunksLeft = reinterpret_cast<uint64_t *>(ptrLeft);
+  uint64_t *chunksRight = reinterpret_cast<uint64_t *>(ptrRight);
+
+#pragma GCC unroll(4)
   for (std::size_t i = 0; i < numChunks; ++i) {
-    uint64_t chunk = (bs >> (i * chunkSize)).to_ullong();
-    if (chunk != 0) {
-      return (i * chunkSize + std::countr_zero(chunk));
+    if (chunksLeft[i] & chunksRight[i]) {
+      return (i * chunkSize + std::countr_zero(chunksLeft[i] & chunksRight[i]));
     }
   }
   return N + 1;
 }
 
-template <typename T>
-void parallel_fill(std::vector<T> &v, const T &value) {
+template <typename T> void parallel_fill(std::vector<T> &v, const T &value) {
 #pragma omp parallel
   {
     auto tid = omp_get_thread_num();
@@ -54,8 +63,7 @@ void parallel_assign(std::vector<T> &v, std::size_t n, const T &value) {
   parallel_fill(v, value);
 }
 
-template <typename T>
-void parallel_iota(std::vector<T> &v, T start_value) {
+template <typename T> void parallel_iota(std::vector<T> &v, T start_value) {
 #pragma omp parallel
   {
     auto tid = omp_get_thread_num();
@@ -80,9 +88,8 @@ void parallel_assign_iota(std::vector<T> &v, std::size_t n, T start_value) {
 }
 
 template <std::integral VALUE>
-std::vector<std::pair<VALUE, VALUE>> generateRandomQueries(int numQueries,
-                                                           int minVertex,
-                                                           int maxVertex) {
+std::vector<std::pair<VALUE, VALUE>>
+generateRandomQueries(int numQueries, int minVertex, int maxVertex) {
   std::vector<std::pair<VALUE, VALUE>> queries;
   std::srand(42);
 

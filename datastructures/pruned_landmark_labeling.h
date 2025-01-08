@@ -98,7 +98,7 @@ struct PLL {
           assert(reachability[!dir][v].any());
 
           auto result =
-              findFirstOne(reachability[dir][w] & reachability[!dir][v]);
+              findFirstOne(reachability[dir][w], reachability[!dir][v]);
 
           prune |= (result < i);
         }

@@ -37,9 +37,8 @@
 #include "topological_sort.h"
 #include "utils.h"
 
-template <int WIDTH = 256, class LABEL = Label>
-struct HLDAG {
- public:
+template <int WIDTH = 256, class LABEL = Label> struct HLDAG {
+public:
   std::array<std::vector<LABEL>, 2> labels;
 
   std::vector<uint8_t> alreadyProcessed;
@@ -53,10 +52,8 @@ struct HLDAG {
   PLL<WIDTH, LABEL> pll;
 
   HLDAG(const Graph &fwdGraph, const Graph &bwdGraph)
-      : labels{std::vector<LABEL>(), std::vector<LABEL>()},
-        alreadyProcessed(),
-        graph{&fwdGraph, &bwdGraph},
-        edges(),
+      : labels{std::vector<LABEL>(), std::vector<LABEL>()}, alreadyProcessed(),
+        graph{&fwdGraph, &bwdGraph}, edges(),
         lookup{std::vector<uint8_t>(), std::vector<uint8_t>()},
         reachability{std::vector<std::bitset<WIDTH>>(),
                      std::vector<std::bitset<WIDTH>>()},
@@ -92,11 +89,11 @@ struct HLDAG {
   }
 
   void runSweep(const std::size_t left, const std::vector<Vertex> &ordering) {
-    /* assert(left + WIDTH < ordering.size()); */
+    assert(left + WIDTH < ordering.size());
     resetReachability();
 
-    for (int i = 0;
-         i < std::min(WIDTH, static_cast<int>(ordering.size() - left)); ++i) {
+#pragma GCC unroll(4)
+    for (int i = 0; i < WIDTH; ++i) {
       const auto vertex = ordering[left + i];
 
       reachability[FWD][vertex][i] = 1;
@@ -119,6 +116,12 @@ struct HLDAG {
 
     fwdSweep();
     bwdSweep();
+
+    /*     std::thread fwdThread(fwdSweep); */
+    /*     std::thread bwdThread(bwdSweep); */
+
+    /*     fwdThread.join(); */
+    /*     bwdThread.join(); */
   }
 
   std::size_t computeTotalBytes() const {
@@ -180,9 +183,11 @@ struct HLDAG {
   void print() const {
     for (std::size_t v = 0; v < graph[FWD]->numVertices(); ++v) {
       std::cout << " -> " << v << "\n\t";
-      for (auto h : labels[FWD][v].nodes) std::cout << h << " ";
+      for (auto h : labels[FWD][v].nodes)
+        std::cout << h << " ";
       std::cout << "\n <- " << v << "\n\t";
-      for (auto h : labels[BWD][v].nodes) std::cout << h << " ";
+      for (auto h : labels[BWD][v].nodes)
+        std::cout << h << " ";
       std::cout << std::endl;
     }
   }
@@ -203,12 +208,12 @@ struct HLDAG {
       std::shuffle(randomNumber.begin(), randomNumber.end(), g);
 
       auto degreeCompRandom = [&](const auto left, const auto right) {
-        return std::forward_as_tuple(
-                   graph[FWD]->degree(left) + graph[BWD]->degree(left),
-                   randomNumber[left]) >
-               std::forward_as_tuple(
-                   graph[FWD]->degree(right) + graph[BWD]->degree(right),
-                   randomNumber[right]);
+        return std::forward_as_tuple(graph[FWD]->degree(left) +
+                                         graph[BWD]->degree(left),
+                                     randomNumber[left]) >
+               std::forward_as_tuple(graph[FWD]->degree(right) +
+                                         graph[BWD]->degree(right),
+                                     randomNumber[right]);
       };
 
       std::iota(ordering.begin(), ordering.end(), 0);

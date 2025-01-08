@@ -44,7 +44,11 @@ int main(int argc, char *argv[]) {
   const auto compress = parser.get<bool>("c");
   const auto run_benchmark = parser.get<bool>("b");
 
+<<<<<<< HEAD
   const int K = 64;
+=======
+  const int K = 256;
+>>>>>>> a63db62 (added bitsets)
 
   if (numThreads <= 0) {
     std::cout << "Number of threads should be greater than 0!" << std::endl;
