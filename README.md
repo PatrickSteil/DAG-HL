@@ -40,15 +40,16 @@ The file contains the labels for all vertices in the graph. Each vertex contribu
 #### File Format
 1.  **`o` Line (Outgoing Hubs)**:
     -   Starts with the character `o`.
+    -   Followed by the vertex ID.
     -   Followed by the hubs that are reachable in the forward direction.
-    -   Example: `o 1 3`.
+    -   Example: `o 0 1 3`, indicates the outgoing hubs for vertex 0 are: 1 and 3
 2.  **`i` Line (Incoming Hubs)**:
     -   Starts with the character `i`.
+    -   Followed by the vertex ID.
     -   Followed by the hubs that are reachable in the backward direction.
-    -   Example: `i 2 4`.
+    -   Example: `i 0 2 4`, indicates the incoming hubs for vertex 0 are: 2 and 4
 3.  Each vertex contributes exactly **two lines** to the file, one starting with `o` and one starting with `i`.
 4. The number of lines is 2 * number of vertices.
-5. The hubs for vertex v starts at line number 2*v. 
 
 #### Example File
 For a graph with the following labels:
@@ -57,10 +58,10 @@ For a graph with the following labels:
 
 The output file will be:
 ```
-o 1 3
-i 2 4
-o 2
-i 0 3
+o 0 1 3
+i 0 2 4
+o 1 2
+i 1 0 3
 ```
 
 #### **Notes**
