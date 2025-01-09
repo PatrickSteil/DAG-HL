@@ -33,23 +33,25 @@ template <int WIDTH = 256, class LABEL = Label>
 struct PLL {
  public:
   std::array<std::vector<LABEL>, 2> &labels;
-  std::array<std::vector<uint8_t>, 2> &lookup;
   std::array<std::vector<std::bitset<WIDTH>>, 2> &reachability;
   std::vector<uint8_t> &alreadyProcessed;
   std::array<const Graph *, 2> &graph;
+  std::array<std::vector<std::uint16_t>, 2> lookup;
   std::array<bfs::BFS, 2> bfs;
+  std::uint16_t generation;
 
   PLL(std::array<std::vector<LABEL>, 2> &labels,
-      std::array<std::vector<uint8_t>, 2> &lookup,
       std::array<std::vector<std::bitset<WIDTH>>, 2> &reachability,
       std::vector<uint8_t> &alreadyProcessed,
       std::array<const Graph *, 2> &graph)
       : labels(labels),
-        lookup(lookup),
         reachability(reachability),
         alreadyProcessed(alreadyProcessed),
         graph(graph),
-        bfs{bfs::BFS(*graph[FWD]), bfs::BFS(*graph[BWD])} {};
+        lookup{std::vector<std::uint16_t>(graph[FWD]->numVertices(), 0),
+               std::vector<std::uint16_t>(graph[FWD]->numVertices(), 0)},
+        bfs{bfs::BFS(*graph[FWD]), bfs::BFS(*graph[BWD])},
+        generation(0){};
 
   void run(const std::vector<Vertex> &ordering) {
     StatusLog log("Computing HLs");
@@ -69,8 +71,9 @@ struct PLL {
     labels[BWD].assign(numVertices, LABEL());
     labels[FWD].assign(numVertices, LABEL());
 
-    lookup[BWD].assign(numVertices, false);
-    lookup[FWD].assign(numVertices, false);
+    lookup[BWD].assign(numVertices, 0);
+    lookup[FWD].assign(numVertices, 0);
+    generation = 1;
 
     alreadyProcessed.assign(numVertices, false);
 
@@ -85,33 +88,32 @@ struct PLL {
     assert(i < WIDTH);
 
     const Vertex v = ordering[left + i];
-    modifyLookups(v, true);
+
+    setLookup(v);
 
     auto runOneDirection = [&](const DIRECTION dir) -> void {
       bfs[dir].run(v, bfs::noOp, [&](const Vertex w) {
-        bool prune = alreadyProcessed[w] ||
-                     labels[!dir][w].appliesToAny(
-                         [&](const Vertex h) { return lookup[dir][h]; });
-
+        bool prune =  // alreadyProcessed[w] ||
+            labels[!dir][w].appliesToAny(
+                [&](const Vertex h) { return (lookup[dir][h] == generation); });
         if constexpr (PRUNE_VIA_BITSET) {
           assert(reachability[dir][w].any());
           assert(reachability[!dir][v].any());
 
           auto result =
               findFirstOne(reachability[dir][w], reachability[!dir][v]);
-
           prune |= (result < i);
         }
         return prune;
       });
     };
 
-#pragma omp parallel for num_threads(2)
+    /* #pragma omp parallel for num_threads(2) */
     for (auto dir : {FWD, BWD}) {
       runOneDirection(dir);
     }
 
-#pragma omp parallel for num_threads(2)
+    /* #pragma omp parallel for num_threads(2) */
     for (auto dir : {FWD, BWD}) {
       bfs[dir].doForAllVerticesInQ([&](const Vertex u) {
         assert(!labels[!dir][u].contains(v));
@@ -119,20 +121,19 @@ struct PLL {
       });
     }
 
-    alreadyProcessed[v] = true;
-    modifyLookups(v, false);
+    /* alreadyProcessed[v] = true; */
   }
 
   void runPrunedBFS(const Vertex v) {
     assert(v < labels[BWD].size());
 
-    modifyLookups(v, true);
+    setLookup(v);
 
     auto runOneDirection = [&](const DIRECTION dir) -> void {
       bfs[dir].run(v, bfs::noOp, [&](const Vertex w) {
-        return alreadyProcessed[w] ||
-               labels[!dir][w].appliesToAny(
-                   [&](const Vertex h) { return lookup[dir][h]; });
+        return  // alreadyProcessed[w] ||
+            labels[!dir][w].appliesToAny(
+                [&](const Vertex h) { return (lookup[dir][h] == generation); });
       });
     };
 
@@ -149,20 +150,24 @@ struct PLL {
       });
     }
 
-    alreadyProcessed[v] = true;
-    modifyLookups(v, false);
+    /* alreadyProcessed[v] = true; */
   }
 
-  void modifyLookups(const Vertex v, bool value) {
+  void setLookup(const Vertex v) {
+    generation++;
+
+    if (generation == 0) {
+      std::fill(lookup[FWD].begin(), lookup[FWD].end(), 0);
+      std::fill(lookup[BWD].begin(), lookup[BWD].end(), 0);
+
+      generation = 1;
+    }
+
     auto forDir = [&](const DIRECTION dir) -> void {
-      for (std::size_t i = 0; i < labels[dir][v].size(); ++i) {
-        if (i + 4 < labels[dir][v].size()) {
-          PREFETCH(&lookup[dir][labels[dir][v][i + 4]]);
-        }
-        const Vertex u = labels[dir][v][i];
-        assert(u < lookup[dir].size());
-        lookup[dir][u] = value;
-      }
+      labels[dir][v].doForAll([&](const Vertex hub) {
+        assert(hub < lookup[dir].size());
+        lookup[dir][hub] = generation;
+      });
     };
 
     forDir(FWD);

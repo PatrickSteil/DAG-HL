@@ -17,7 +17,8 @@
 #include <random>
 #include <vector>
 
-template <std::size_t N> void *getUnderlyingPointer(std::bitset<N> &bs) {
+template <std::size_t N>
+void *getUnderlyingPointer(std::bitset<N> &bs) {
   return reinterpret_cast<void *>(&bs);
 }
 
@@ -42,7 +43,8 @@ std::size_t findFirstOne(std::bitset<N> &left, std::bitset<N> &right) {
   return N + 1;
 }
 
-template <typename T> void parallel_fill(std::vector<T> &v, const T &value) {
+template <typename T>
+void parallel_fill(std::vector<T> &v, const T &value) {
 #pragma omp parallel
   {
     auto tid = omp_get_thread_num();
@@ -63,7 +65,8 @@ void parallel_assign(std::vector<T> &v, std::size_t n, const T &value) {
   parallel_fill(v, value);
 }
 
-template <typename T> void parallel_iota(std::vector<T> &v, T start_value) {
+template <typename T>
+void parallel_iota(std::vector<T> &v, T start_value) {
 #pragma omp parallel
   {
     auto tid = omp_get_thread_num();
@@ -88,8 +91,9 @@ void parallel_assign_iota(std::vector<T> &v, std::size_t n, T start_value) {
 }
 
 template <std::integral VALUE>
-std::vector<std::pair<VALUE, VALUE>>
-generateRandomQueries(int numQueries, int minVertex, int maxVertex) {
+std::vector<std::pair<VALUE, VALUE>> generateRandomQueries(int numQueries,
+                                                           int minVertex,
+                                                           int maxVertex) {
   std::vector<std::pair<VALUE, VALUE>> queries;
   std::srand(42);
 

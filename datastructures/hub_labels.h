@@ -55,6 +55,13 @@ struct Label {
   Vertex &operator[](std::size_t i) { return nodes[i]; }
   const Vertex &operator[](std::size_t i) const { return nodes[i]; }
 
+  template <typename FUNC>
+  void doForAll(FUNC &&apply) {
+    for (auto h : nodes) {
+      apply(h);
+    }
+  }
+
   // toVerfiy should take (const Vertex h) as argument
   template <typename FUNC>
   bool appliesToAny(FUNC &&toVerfiy) {
@@ -133,6 +140,14 @@ struct LabelThreadSafe : Label {
     std::lock_guard<std::mutex> lock(mutex);
     return std::find(nodes.begin(), nodes.end(), hub) != nodes.end();
   };
+
+  template <typename FUNC>
+  void doForAll(FUNC &&apply) {
+    std::lock_guard<std::mutex> lock(mutex);
+    for (auto h : nodes) {
+      apply(h);
+    }
+  }
 
   template <typename FUNC>
   bool appliesToAny(FUNC &&toVerfiy) {
@@ -218,13 +233,13 @@ void saveToFile(std::array<std::vector<LABEL>, 2> &labels,
   std::size_t N = labels[FWD].size();
 
   for (std::size_t v = 0; v < N; ++v) {
-    outFile << "o";
+    outFile << "o " << v;
     for (const Vertex hub : labels[FWD][v].nodes) {
       outFile << " " << hub;
     }
     outFile << "\n";
 
-    outFile << "i";
+    outFile << "i " << v;
     for (const Vertex hub : labels[BWD][v].nodes) {
       outFile << " " << hub;
     }

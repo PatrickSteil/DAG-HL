@@ -44,7 +44,7 @@ int main(int argc, char *argv[]) {
   const auto compress = parser.get<bool>("c");
   const auto run_benchmark = parser.get<bool>("b");
 
-  const int K = 256;
+  const int K = 64;
 
   if (numThreads <= 0) {
     std::cout << "Number of threads should be greater than 0!" << std::endl;
@@ -61,7 +61,7 @@ int main(int argc, char *argv[]) {
 
   Graph rev = g.reverseGraph();
 
-  HLDAG<K, LabelThreadSafe> hl(g, rev);
+  HLDAG<K, LabelThreadSafe> hl(g, rev, numThreads);
 
   hl.run(orderingFile);
 
