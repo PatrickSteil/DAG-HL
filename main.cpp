@@ -44,7 +44,7 @@ int main(int argc, char *argv[]) {
   const auto compress = parser.get<bool>("c");
   const auto run_benchmark = parser.get<bool>("b");
 
-  const int K = 64;
+  const int K = 128;
 
   if (numThreads <= 0) {
     std::cout << "Number of threads should be greater than 0!" << std::endl;

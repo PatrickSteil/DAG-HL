@@ -15,6 +15,7 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cassert>
 #include <cstdint>
 #include <fstream>
@@ -34,7 +35,7 @@ struct PLL {
  public:
   std::array<std::vector<LABEL>, 2> &labels;
   std::array<std::vector<std::bitset<WIDTH>>, 2> &reachability;
-  std::vector<uint8_t> &alreadyProcessed;
+  std::vector<std::atomic<bool>> &alreadyProcessed;
   std::array<const Graph *, 2> &graph;
   std::array<std::vector<std::uint16_t>, 2> lookup;
   std::array<bfs::BFS, 2> bfs;
@@ -42,7 +43,7 @@ struct PLL {
 
   PLL(std::array<std::vector<LABEL>, 2> &labels,
       std::array<std::vector<std::bitset<WIDTH>>, 2> &reachability,
-      std::vector<uint8_t> &alreadyProcessed,
+      std::vector<std::atomic<bool>> &alreadyProcessed,
       std::array<const Graph *, 2> &graph)
       : labels(labels),
         reachability(reachability),
@@ -75,7 +76,7 @@ struct PLL {
     lookup[FWD].assign(numVertices, 0);
     generation = 1;
 
-    alreadyProcessed.assign(numVertices, false);
+    alreadyProcessed = std::vector<std::atomic<bool>>(numVertices, false);
 
     bfs[FWD].reset(numVertices);
     bfs[BWD].reset(numVertices);
@@ -93,9 +94,10 @@ struct PLL {
 
     auto runOneDirection = [&](const DIRECTION dir) -> void {
       bfs[dir].run(v, bfs::noOp, [&](const Vertex w) {
-        bool prune =  // alreadyProcessed[w] ||
-            labels[!dir][w].appliesToAny(
-                [&](const Vertex h) { return (lookup[dir][h] == generation); });
+        bool prune = alreadyProcessed[w].load(std::memory_order_relaxed) ||
+                     labels[!dir][w].appliesToAny([&](const Vertex h) {
+                       return (lookup[dir][h] == generation);
+                     });
         if constexpr (PRUNE_VIA_BITSET) {
           assert(reachability[dir][w].any());
           assert(reachability[!dir][v].any());
@@ -121,7 +123,7 @@ struct PLL {
       });
     }
 
-    /* alreadyProcessed[v] = true; */
+    alreadyProcessed[v].store(true, std::memory_order_relaxed);
   }
 
   void runPrunedBFS(const Vertex v) {
@@ -131,9 +133,10 @@ struct PLL {
 
     auto runOneDirection = [&](const DIRECTION dir) -> void {
       bfs[dir].run(v, bfs::noOp, [&](const Vertex w) {
-        return  // alreadyProcessed[w] ||
-            labels[!dir][w].appliesToAny(
-                [&](const Vertex h) { return (lookup[dir][h] == generation); });
+        return alreadyProcessed[w].load(std::memory_order_relaxed) ||
+               labels[!dir][w].appliesToAny([&](const Vertex h) {
+                 return (lookup[dir][h] == generation);
+               });
       });
     };
 
@@ -150,7 +153,7 @@ struct PLL {
       });
     }
 
-    /* alreadyProcessed[v] = true; */
+    alreadyProcessed[v].store(true, std::memory_order_relaxed);
   }
 
   void setLookup(const Vertex v) {

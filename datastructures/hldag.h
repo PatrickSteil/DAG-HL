@@ -16,6 +16,7 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <bitset>
 #include <cassert>
 #include <cmath>
@@ -42,7 +43,7 @@ struct HLDAG {
  public:
   std::array<std::vector<LABEL>, 2> labels;
 
-  std::vector<uint8_t> alreadyProcessed;
+  std::vector<std::atomic<bool>> alreadyProcessed;
   std::array<const Graph *, 2> graph;
 
   std::vector<Edge> edges;
@@ -79,13 +80,15 @@ struct HLDAG {
 
     std::size_t i = 0;
 
-    for (; i + WIDTH < (numVertices >> 8); i += WIDTH) {
-      runSweep(i, ordering);
+    if (numThreads > 1) {
+      for (; i + WIDTH < (numVertices >> 7); i += WIDTH) {
+        runSweep(i, ordering);
 
 #pragma omp parallel for schedule(dynamic, 1) num_threads(numThreads)
-      for (std::size_t step = 0; step < WIDTH; ++step) {
-        int threadId = omp_get_thread_num();
-        plls[threadId].runPrunedBFS(i, step, ordering);
+        for (std::size_t step = 0; step < WIDTH; ++step) {
+          int threadId = omp_get_thread_num();
+          plls[threadId].runPrunedBFS(i, step, ordering);
+        }
       }
     }
 
@@ -270,7 +273,8 @@ struct HLDAG {
   void init(std::size_t numVertices) {
     parallel_assign(labels[BWD], numVertices, LABEL());
     parallel_assign(labels[FWD], numVertices, LABEL());
-    parallel_assign(alreadyProcessed, numVertices, uint8_t(0));
+
+    alreadyProcessed = std::vector<std::atomic<bool>>(numVertices);
 
     // fill edges
     TopologicalSort sorter(*graph[FWD]);
