@@ -11,7 +11,6 @@
 #define PREFETCH(addr)
 #endif
 
-#include <immintrin.h>
 #include <omp.h>
 
 #include <algorithm>
@@ -66,6 +65,7 @@ struct HLDAG {
     init(fwdGraph.numVertices());
   };
 
+  template <bool PARALL_TAIL = true>
   void run(const std::string &orderingFileName) {
     StatusLog log("Computing HLs");
     assert(graph[FWD]->numVertices() == graph[BWD]->numVertices());
@@ -87,13 +87,21 @@ struct HLDAG {
 #pragma omp parallel for schedule(dynamic, 1) num_threads(numThreads)
         for (std::size_t step = 0; step < WIDTH; ++step) {
           int threadId = omp_get_thread_num();
-          plls[threadId].runPrunedBFS(i, step, ordering);
+          plls[threadId].template runPrunedBFS<true>(i, step, ordering);
         }
       }
     }
 
-    for (; i < numVertices; ++i) {
-      plls[0].runPrunedBFS(ordering[i]);
+    if constexpr (PARALL_TAIL) {
+#pragma omp parallel for schedule(dynamic, 8) num_threads(numThreads)
+      for (std::size_t j = i; j < numVertices; ++j) {
+        int threadId = omp_get_thread_num();
+        plls[threadId].template runPrunedBFS<false>(j, 0, ordering);
+      }
+    } else {
+      for (std::size_t j = i; j < numVertices; ++j) {
+        plls[0].runPrunedBFS(ordering[j]);
+      }
     }
   }
 

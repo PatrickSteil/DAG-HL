@@ -110,19 +110,3 @@ std::vector<std::pair<VALUE, VALUE>> generateRandomQueries(int numQueries,
 
   return queries;
 }
-
-template <typename Iterator, typename Predicate>
-bool any_of_with_prefetch(Iterator begin, Iterator end, Predicate pred) {
-  const std::size_t prefetch_distance = 8;
-
-  bool result = false;
-
-  for (Iterator it = begin; it != end; ++it) {
-    if (std::distance(it, end) > prefetch_distance) {
-      __builtin_prefetch(&(*(it + prefetch_distance)), 0, 1);
-    }
-
-    result |= (pred(*it));
-  }
-  return result;
-}

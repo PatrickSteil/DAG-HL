@@ -110,12 +110,10 @@ struct PLL {
       });
     };
 
-    /* #pragma omp parallel for num_threads(2) */
     for (auto dir : {FWD, BWD}) {
       runOneDirection(dir);
     }
 
-    /* #pragma omp parallel for num_threads(2) */
     for (auto dir : {FWD, BWD}) {
       bfs[dir].doForAllVerticesInQ([&](const Vertex u) {
         assert(!labels[!dir][u].contains(v));
@@ -126,6 +124,7 @@ struct PLL {
     alreadyProcessed[v].store(true, std::memory_order_relaxed);
   }
 
+  // simple version
   void runPrunedBFS(const Vertex v) {
     assert(v < labels[BWD].size());
 

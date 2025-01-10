@@ -63,7 +63,7 @@ int main(int argc, char *argv[]) {
 
   HLDAG<K, LabelThreadSafe> hl(g, rev, numThreads);
 
-  hl.run(orderingFile);
+  hl.template run<true>(orderingFile);
 
   if (compress) {
     auto permutation = computePermutation(hl.labels);
