@@ -29,7 +29,7 @@ For example, to build and run the release build:
 ```bash
 cd build-release
 make
-./HCL -h
+./DAGHL -h
 ```
 
 ## Output File Format
@@ -64,40 +64,35 @@ o 1 2
 i 1 0 3
 ```
 
-#### **Notes**
--   The file format is space-separated.
--   Hubs are listed in arbitrary order but reflect the graph's hub labeling.
-
-#### **Usage**
--   The format is compact and easy to parse programmatically, with the leading `o` or `i` distinguishing the direction of the labels.
-
 ## Example
 
 ```bash
->> ./HCL -i icice.dimacs.gr -s -c -b
-Reading graph from dimacs ... done [189ms]
+>>> ./DAGHL -s -i ../data/icice.dimacs -t 6 -b
+Reading graph from dimacs ... done [188ms]
 Forward Graph Statistics:
   Number of vertices: 186068
   Number of edges:    586679
   Min degree:         0
   Max degree:         19
   Average degree:     3.15304
-Reversing Graph ... done [3ms]
-Computing a topological ordering ... done [6ms]
-Computing HLs ... done [3180ms]
-Compute Hub permutation ... done [56ms]
-Sort all labels ... done [24ms]
+Reversing Graph ... done [6ms]
+Init the datastructures ... done [52ms]
+Computing HLs ... done [1118ms]
+Sort all labels ... done [86ms]
 Forward Labels Statistics:
-  Min Size: 1
-  Max Size: 232
-  Avg Size: 65.1842
+  Min Size:     1
+  Max Size:     222
+  Avg Size:     64.8756
 Backward Labels Statistics:
-  Min Size: 1
-  Max Size: 131
-  Avg Size: 42.7483
+  Min Size:     1
+  Max Size:     133
+  Avg Size:     42.7924
+FWD # count:    12071266
+BWD # count:    7962297
+Both # count:   20033563
 Total memory consumption [megabytes]:
-  117.881
-The 10000 random queries took in total 200523 [ms] and on average 20.0523 [ns]!
+  131.711
+The 10000 random queries took in total 197383 [ms] and on average 19.7383 [ns]!
 ```
 
 ## Reference
