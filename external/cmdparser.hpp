@@ -14,8 +14,9 @@
 namespace cli {
 /// Class used to wrap integer types to specify desired numerical base for
 /// specific argument parsing
-template <typename T, int numericalBase = 0> class NumericalBase {
-public:
+template <typename T, int numericalBase = 0>
+class NumericalBase {
+ public:
   /// This constructor required for correct AgrumentCountChecker initialization
   NumericalBase() : value(0), base(numericalBase) {}
 
@@ -36,16 +37,21 @@ struct CallbackArgs {
   std::ostream &error;
 };
 class Parser {
-private:
+ private:
   class CmdBase {
-  public:
+   public:
     explicit CmdBase(const std::string &name, const std::string &alternative,
                      const std::string &description, bool required,
                      bool dominant, bool variadic)
-        : name(name), command(name.size() > 0 ? "-" + name : ""),
+        : name(name),
+          command(name.size() > 0 ? "-" + name : ""),
           alternative(alternative.size() > 0 ? "--" + alternative : ""),
-          description(description), required(required), handled(false),
-          arguments({}), dominant(dominant), variadic(variadic) {}
+          description(description),
+          required(required),
+          handled(false),
+          arguments({}),
+          dominant(dominant),
+          variadic(variadic) {}
 
     virtual ~CmdBase() {}
 
@@ -67,20 +73,24 @@ private:
     }
   };
 
-  template <typename T> struct ArgumentCountChecker {
+  template <typename T>
+  struct ArgumentCountChecker {
     static constexpr bool Variadic = false;
   };
 
-  template <typename T> struct ArgumentCountChecker<cli::NumericalBase<T>> {
+  template <typename T>
+  struct ArgumentCountChecker<cli::NumericalBase<T>> {
     static constexpr bool Variadic = false;
   };
 
-  template <typename T> struct ArgumentCountChecker<std::vector<T>> {
+  template <typename T>
+  struct ArgumentCountChecker<std::vector<T>> {
     static constexpr bool Variadic = true;
   };
 
-  template <typename T> class CmdFunction final : public CmdBase {
-  public:
+  template <typename T>
+  class CmdFunction final : public CmdBase {
+   public:
     explicit CmdFunction(const std::string &name,
                          const std::string &alternative,
                          const std::string &description, bool required,
@@ -104,8 +114,9 @@ private:
     T value;
   };
 
-  template <typename T> class CmdArgument final : public CmdBase {
-  public:
+  template <typename T>
+  class CmdArgument final : public CmdBase {
+   public:
     explicit CmdArgument(const std::string &name,
                          const std::string &alternative,
                          const std::string &description, bool required,
@@ -129,8 +140,7 @@ private:
 
   static int parse(const std::vector<std::string> &elements, const int &,
                    int numberBase = 0) {
-    if (elements.size() != 1)
-      throw std::bad_cast();
+    if (elements.size() != 1) throw std::bad_cast();
 
     return std::stoi(elements[0], 0, numberBase);
   }
@@ -146,39 +156,34 @@ private:
 
   static double parse(const std::vector<std::string> &elements,
                       const double &) {
-    if (elements.size() != 1)
-      throw std::bad_cast();
+    if (elements.size() != 1) throw std::bad_cast();
 
     return std::stod(elements[0]);
   }
 
   static float parse(const std::vector<std::string> &elements, const float &) {
-    if (elements.size() != 1)
-      throw std::bad_cast();
+    if (elements.size() != 1) throw std::bad_cast();
 
     return std::stof(elements[0]);
   }
 
   static long double parse(const std::vector<std::string> &elements,
                            const long double &) {
-    if (elements.size() != 1)
-      throw std::bad_cast();
+    if (elements.size() != 1) throw std::bad_cast();
 
     return std::stold(elements[0]);
   }
 
   static unsigned int parse(const std::vector<std::string> &elements,
                             const unsigned int &, int numberBase = 0) {
-    if (elements.size() != 1)
-      throw std::bad_cast();
+    if (elements.size() != 1) throw std::bad_cast();
 
     return static_cast<unsigned int>(std::stoul(elements[0], 0, numberBase));
   }
 
   static unsigned long parse(const std::vector<std::string> &elements,
                              const unsigned long &, int numberBase = 0) {
-    if (elements.size() != 1)
-      throw std::bad_cast();
+    if (elements.size() != 1) throw std::bad_cast();
 
     return std::stoul(elements[0], 0, numberBase);
   }
@@ -186,32 +191,28 @@ private:
   static unsigned long long parse(const std::vector<std::string> &elements,
                                   const unsigned long long &,
                                   int numberBase = 0) {
-    if (elements.size() != 1)
-      throw std::bad_cast();
+    if (elements.size() != 1) throw std::bad_cast();
 
     return std::stoull(elements[0], 0, numberBase);
   }
 
   static long long parse(const std::vector<std::string> &elements,
                          const long long &, int numberBase = 0) {
-    if (elements.size() != 1)
-      throw std::bad_cast();
+    if (elements.size() != 1) throw std::bad_cast();
 
     return std::stoll(elements[0], 0, numberBase);
   }
 
   static long parse(const std::vector<std::string> &elements, const long &,
                     int numberBase = 0) {
-    if (elements.size() != 1)
-      throw std::bad_cast();
+    if (elements.size() != 1) throw std::bad_cast();
 
     return std::stol(elements[0], 0, numberBase);
   }
 
   static std::string parse(const std::vector<std::string> &elements,
                            const std::string &) {
-    if (elements.size() != 1)
-      throw std::bad_cast();
+    if (elements.size() != 1) throw std::bad_cast();
 
     return elements[0];
   }
@@ -249,7 +250,8 @@ private:
     return parse(elements, wrapper.value, wrapper.base);
   }
 
-  template <class T> static std::string stringify(const T &value) {
+  template <class T>
+  static std::string stringify(const T &value) {
     return std::to_string(value);
   }
 
@@ -273,14 +275,15 @@ private:
 
   static std::string stringify(const std::string &str) { return str; }
 
-public:
-  template <typename T> class ArgumentPromise {
-  public:
+ public:
+  template <typename T>
+  class ArgumentPromise {
+   public:
     explicit ArgumentPromise(CmdArgument<T> *cmd) : cmd_(cmd) {}
 
     T get() const { return cmd_->value; }
 
-  private:
+   private:
     CmdArgument<T> *cmd_;
   };
 
@@ -372,9 +375,10 @@ public:
   }
 
   template <typename T>
-  ArgumentPromise<T>
-  set_required(const std::string &name, const std::string &alternative,
-               const std::string &description = "", bool dominant = false) {
+  ArgumentPromise<T> set_required(const std::string &name,
+                                  const std::string &alternative,
+                                  const std::string &description = "",
+                                  bool dominant = false) {
     auto command =
         new CmdArgument<T>{name, alternative, description, true, dominant};
     _commands.push_back(command);
@@ -382,10 +386,11 @@ public:
   }
 
   template <typename T>
-  ArgumentPromise<T>
-  set_optional(const std::string &name, const std::string &alternative,
-               T defaultValue, const std::string &description = "",
-               bool dominant = false) {
+  ArgumentPromise<T> set_optional(const std::string &name,
+                                  const std::string &alternative,
+                                  T defaultValue,
+                                  const std::string &description = "",
+                                  bool dominant = false) {
     auto command =
         new CmdArgument<T>{name, alternative, description, false, dominant};
     command->value = defaultValue;
@@ -416,7 +421,6 @@ public:
 
   bool doesArgumentExist(std::string name, std::string altName) {
     for (const auto &argument : _arguments) {
-
       if (argument == '-' + name || argument == altName) {
         return true;
       }
@@ -484,7 +488,8 @@ public:
     return true;
   }
 
-  template <typename T> T get(const std::string &name) const {
+  template <typename T>
+  T get(const std::string &name) const {
     for (const auto &command : _commands) {
       if (command->name == name) {
         auto cmd = dynamic_cast<CmdArgument<T> *>(command);
@@ -501,7 +506,10 @@ public:
     throw std::runtime_error("The parameter " + name + " could not be found.");
   }
 
-  template <typename T> T get_default() const { return get<T>(""); }
+  template <typename T>
+  T get_default() const {
+    return get<T>("");
+  }
 
   template <typename T>
   T get_if(const std::string &name, std::function<T(T)> callback) const {
@@ -525,7 +533,7 @@ public:
 
   inline const std::string &app_name() const { return _appname; }
 
-protected:
+ protected:
   CmdBase *find(const std::string &name) {
     for (auto command : _commands) {
       if (command->is(name)) {
@@ -611,10 +619,10 @@ protected:
     _general_help_text = generalHelpText;
   }
 
-private:
+ private:
   std::string _appname;
   std::string _general_help_text;
   std::vector<std::string> _arguments;
   std::vector<CmdBase *> _commands;
 };
-} // namespace cli
+}  // namespace cli

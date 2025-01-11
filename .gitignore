@@ -1,5 +1,5 @@
 build-*
 python*
-data*
+data/*
 result*
 add_licences.sh

@@ -11,11 +11,11 @@
 #define PREFETCH(addr)
 #endif
 
-#include <immintrin.h>
 #include <omp.h>
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <bitset>
 #include <cassert>
 #include <cmath>
@@ -37,27 +37,35 @@
 #include "topological_sort.h"
 #include "utils.h"
 
-template <class LABEL = Label>
+template <int WIDTH = 256, class LABEL = Label>
 struct HLDAG {
  public:
   std::array<std::vector<LABEL>, 2> labels;
 
-  std::vector<uint8_t> alreadyProcessed;
+  std::vector<std::atomic<bool>> alreadyProcessed;
   std::array<const Graph *, 2> graph;
 
-  std::array<std::vector<uint8_t>, 2> lookup;
+  std::vector<Edge> edges;
 
-  PLL<LABEL> pll;
+  std::array<std::vector<std::bitset<WIDTH>>, 2> reachability;
 
-  HLDAG(const Graph &fwdGraph, const Graph &bwdGraph)
+  std::vector<PLL<WIDTH, LABEL>> plls;
+  const int numThreads;
+
+  HLDAG(const Graph &fwdGraph, const Graph &bwdGraph, const int numThreads = 1)
       : labels{std::vector<LABEL>(), std::vector<LABEL>()},
         alreadyProcessed(),
         graph{&fwdGraph, &bwdGraph},
-        lookup{std::vector<uint8_t>(), std::vector<uint8_t>()},
-        pll(labels, lookup, alreadyProcessed, graph) {
+        edges(),
+        reachability{std::vector<std::bitset<WIDTH>>(),
+                     std::vector<std::bitset<WIDTH>>()},
+        plls(numThreads,
+             PLL<WIDTH, LABEL>(labels, reachability, alreadyProcessed, graph)),
+        numThreads(numThreads) {
     init(fwdGraph.numVertices());
   };
 
+  template <bool PARALL_TAIL = true>
   void run(const std::string &orderingFileName) {
     StatusLog log("Computing HLs");
     assert(graph[FWD]->numVertices() == graph[BWD]->numVertices());
@@ -70,9 +78,67 @@ struct HLDAG {
     assert(ordering.size() == numVertices);
     assert(isOrdering(ordering, numVertices));
 
-    for (std::size_t i; i < numVertices; ++i) {
-      pll.runPrunedBFS(ordering[i]);
+    std::size_t i = 0;
+
+    if (numThreads > 1) {
+      for (; i + WIDTH < (numVertices >> 7); i += WIDTH) {
+        runSweep(i, ordering);
+
+#pragma omp parallel for schedule(dynamic, 1) num_threads(numThreads)
+        for (std::size_t step = 0; step < WIDTH; ++step) {
+          int threadId = omp_get_thread_num();
+          plls[threadId].template runPrunedBFS<true>(i, step, ordering);
+        }
+      }
     }
+
+    if constexpr (PARALL_TAIL) {
+#pragma omp parallel for schedule(dynamic, 8) num_threads(numThreads)
+      for (std::size_t j = i; j < numVertices; ++j) {
+        int threadId = omp_get_thread_num();
+        plls[threadId].template runPrunedBFS<false>(j, 0, ordering);
+      }
+    } else {
+      for (std::size_t j = i; j < numVertices; ++j) {
+        plls[0].runPrunedBFS(j, ordering);
+      }
+    }
+  }
+
+  void runSweep(const std::size_t left, const std::vector<Vertex> &ordering) {
+    assert(left + WIDTH < ordering.size());
+    resetReachability();
+
+#pragma GCC unroll(4)
+    for (int i = 0; i < WIDTH; ++i) {
+      const auto vertex = ordering[left + i];
+
+      reachability[FWD][vertex][i] = 1;
+      reachability[BWD][vertex][i] = 1;
+    }
+
+    auto fwdSweep = [&]() -> void {
+      for (std::size_t i = 0; i < edges.size(); ++i) {
+        const auto &edge = edges[i];
+        reachability[FWD][edge.to] |= reachability[FWD][edge.from];
+      }
+    };
+
+    auto bwdSweep = [&]() -> void {
+      for (std::size_t i = edges.size(); i-- > 0;) {
+        const auto &edge = edges[i];
+        reachability[BWD][edge.from] |= reachability[BWD][edge.to];
+      }
+    };
+
+    /* fwdSweep(); */
+    /* bwdSweep(); */
+
+    std::thread fwdThread(fwdSweep);
+    std::thread bwdThread(bwdSweep);
+
+    fwdThread.join();
+    bwdThread.join();
   }
 
   std::size_t computeTotalBytes() const {
@@ -152,8 +218,7 @@ struct HLDAG {
       parallel_assign_iota(randomNumber, graph[FWD]->numVertices(),
                            static_cast<std::size_t>(0));
 
-      std::random_device rd;
-      std::mt19937 g(rd());
+      std::mt19937 g(42);
 
       std::shuffle(randomNumber.begin(), randomNumber.end(), g);
 
@@ -190,32 +255,6 @@ struct HLDAG {
     return ordering;
   }
 
-  std::vector<Vertex> getOrderingDegTopo() {
-    std::vector<Vertex> ordering(graph[FWD]->numVertices(), 0);
-
-    TopologicalSort sorter(*graph[FWD]);
-    std::vector<std::size_t> topoRank(graph[FWD]->numVertices(), 0);
-
-    for (std::size_t i = 0; i < sorter.ordering.size(); ++i) {
-      topoRank[sorter.ordering[i]] = i;
-    }
-
-    std::iota(ordering.begin(), ordering.end(), 0);
-
-    auto rank = [&](auto v) -> double {
-      double centrality = 1 - abs((topoRank[v] / topoRank.size()) - 0.5);
-      return 0.5 * (graph[FWD]->degree(v) + graph[BWD]->degree(v)) +
-             1000 * centrality;
-    };
-
-    std::sort(ordering.begin(), ordering.end(),
-              [&](const auto left, const auto right) {
-                return rank(left) > rank(right);
-              });
-
-    return ordering;
-  }
-
   bool isOrdering(const std::vector<Vertex> &ordering,
                   const std::size_t numVertices) {
     std::set<Vertex> orderedSet(ordering.begin(), ordering.end());
@@ -240,27 +279,42 @@ struct HLDAG {
   };
 
   void init(std::size_t numVertices) {
+    StatusLog log("Init the datastructures");
+
     parallel_assign(labels[BWD], numVertices, LABEL());
     parallel_assign(labels[FWD], numVertices, LABEL());
-    parallel_assign(alreadyProcessed, numVertices, uint8_t(0));
 
-    parallel_assign(lookup[BWD], numVertices, uint8_t(0));
-    parallel_assign(lookup[FWD], numVertices, uint8_t(0));
+    alreadyProcessed = std::vector<std::atomic<bool>>(numVertices);
+
+    TopologicalSort sorter(*graph[FWD]);
+    std::vector<std::size_t> rank;
+    parallel_assign(rank, numVertices, std::size_t(0));
+
+#pragma omp parallel for
+    for (std::size_t i = 0; i < numVertices; ++i) {
+      rank[sorter.getOrdering()[i]] = i;
+    }
+
+    edges.reserve(graph[FWD]->numEdges());
+
+    for (Vertex from = 0; from < numVertices; ++from) {
+      for (std::size_t i = graph[FWD]->beginEdge(from);
+           i < graph[FWD]->endEdge(from); ++i) {
+        edges.emplace_back(from, graph[FWD]->toVertex[i]);
+      }
+    }
+
+    std::sort(edges.begin(), edges.end(),
+              [&](const auto &left, const auto &right) {
+                return std::tie(rank[left.from], rank[left.to]) <
+                       std::tie(rank[right.from], rank[right.to]);
+              });
   }
 
-  void modifyLookups(const Vertex v, bool value) {
-    auto forDir = [&](const DIRECTION dir) -> void {
-      for (std::size_t i = 0; i < labels[dir][v].size(); ++i) {
-        if (i + 4 < labels[dir][v].size()) {
-          PREFETCH(&lookup[dir][labels[dir][v][i + 4]]);
-        }
-        const Vertex u = labels[dir][v][i];
-        assert(u < lookup[dir].size());
-        lookup[dir][u] = value;
-      }
-    };
-
-    forDir(FWD);
-    forDir(BWD);
+  void resetReachability() {
+    parallel_assign(reachability[BWD], graph[FWD]->numVertices(),
+                    std::bitset<WIDTH>());
+    parallel_assign(reachability[FWD], graph[FWD]->numVertices(),
+                    std::bitset<WIDTH>());
   }
 };

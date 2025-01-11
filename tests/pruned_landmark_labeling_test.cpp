@@ -1,12 +1,13 @@
 /*
  * Licensed under MIT License.
  * Author: Patrick Steil
-*/
+ */
 
-#include "../datastructures/graph.h"
 #include "../datastructures/pruned_landmark_labeling.h"
 
 #include <gtest/gtest.h>
+
+#include "../datastructures/graph.h"
 
 TEST(PLLTest, Initialization) {
   Graph fwdGraph;
