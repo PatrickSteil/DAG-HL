@@ -64,7 +64,7 @@ struct PLL {
     init(ordering.size());
 
     for (std::size_t i = 0; i < ordering.size(); ++i) {
-      runPrunedBFS(ordering[i]);
+      runPrunedBFS(i, ordering);
     }
   }
 
@@ -125,7 +125,8 @@ struct PLL {
   }
 
   // simple version
-  void runPrunedBFS(const Vertex v) {
+  void runPrunedBFS(const std::size_t i, const std::vector<Vertex> &ordering) {
+    const Vertex v = ordering[i];
     assert(v < labels[BWD].size());
 
     setLookup(v);

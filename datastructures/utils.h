@@ -13,6 +13,7 @@
 #include <concepts>
 #include <iostream>
 #include <limits>
+#include <memory>
 #include <numeric>
 #include <random>
 #include <vector>
@@ -45,6 +46,8 @@ std::size_t findFirstOne(std::bitset<N> &left, std::bitset<N> &right) {
 
 template <typename T>
 void parallel_fill(std::vector<T> &v, const T &value) {
+  if (v.empty()) return;
+
 #pragma omp parallel
   {
     auto tid = omp_get_thread_num();
@@ -61,12 +64,34 @@ void parallel_fill(std::vector<T> &v, const T &value) {
 
 template <typename T>
 void parallel_assign(std::vector<T> &v, std::size_t n, const T &value) {
-  v.resize(n);
-  parallel_fill(v, value);
+  v.clear();
+  v.reserve(n);
+
+  auto data_ptr = v.data();
+#pragma omp parallel
+  {
+    auto tid = omp_get_thread_num();
+    auto num_threads = omp_get_num_threads();
+    auto chunksize = n / num_threads;
+    auto remainder = n % num_threads;
+
+    auto start =
+        chunksize * tid + std::min(static_cast<std::size_t>(tid),
+                                   static_cast<std::size_t>(remainder));
+    auto end =
+        start + chunksize +
+        (static_cast<std::size_t>(tid) < static_cast<std::size_t>(remainder)
+             ? 1
+             : 0);
+
+    std::uninitialized_fill(data_ptr + start, data_ptr + end, value);
+  }
+  v.resize(n);  // Update size to match the number of elements
 }
 
 template <typename T>
 void parallel_iota(std::vector<T> &v, T start_value) {
+  if (v.empty()) return;
 #pragma omp parallel
   {
     auto tid = omp_get_thread_num();

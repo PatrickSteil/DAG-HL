@@ -100,7 +100,7 @@ struct HLDAG {
       }
     } else {
       for (std::size_t j = i; j < numVertices; ++j) {
-        plls[0].runPrunedBFS(ordering[j]);
+        plls[0].runPrunedBFS(j, ordering);
       }
     }
   }
@@ -279,16 +279,18 @@ struct HLDAG {
   };
 
   void init(std::size_t numVertices) {
+    StatusLog log("Init the datastructures");
+
     parallel_assign(labels[BWD], numVertices, LABEL());
     parallel_assign(labels[FWD], numVertices, LABEL());
 
     alreadyProcessed = std::vector<std::atomic<bool>>(numVertices);
 
-    // fill edges
     TopologicalSort sorter(*graph[FWD]);
     std::vector<std::size_t> rank;
     parallel_assign(rank, numVertices, std::size_t(0));
 
+#pragma omp parallel for
     for (std::size_t i = 0; i < numVertices; ++i) {
       rank[sorter.getOrdering()[i]] = i;
     }

@@ -1,17 +1,18 @@
 /*
  * Licensed under MIT License.
  * Author: Patrick Steil
-*/
+ */
 
 #include "../datastructures/utils.h"
 
-#include <cstdint>
 #include <gtest/gtest.h>
+
+#include <cstdint>
 #include <numeric>
 #include <vector>
 
 class ParallelFillTest : public ::testing::Test {
-protected:
+ protected:
   template <typename T>
   void verify_vector(const std::vector<T> &v, const T &expected_value) {
     EXPECT_TRUE(std::all_of(v.begin(), v.end(), [&expected_value](const T &x) {
@@ -66,7 +67,7 @@ TEST_F(ParallelFillTest, OddSizeVector) {
 }
 
 class ParallelIotaTest : public ::testing::Test {
-protected:
+ protected:
   template <typename T>
   void verify_iota(const std::vector<T> &v, const T &start_value) {
     T value = start_value;

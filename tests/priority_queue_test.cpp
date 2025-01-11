@@ -1,7 +1,7 @@
 /*
  * Licensed under MIT License.
  * Author: Patrick Steil
-*/
+ */
 
 #include "../datastructures/priority_queue.h"
 

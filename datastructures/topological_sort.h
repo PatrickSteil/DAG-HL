@@ -11,16 +11,19 @@
 
 #include "graph.h"
 #include "status_log.h"
+#include "utils.h"
 
 struct TopologicalSort {
   std::vector<Vertex> ordering;
 
   TopologicalSort(const Graph &graph) {
-    StatusLog log("Computing a topological ordering");
+    /* StatusLog log("Computing a topological ordering"); */
     const std::size_t numVertices = graph.numVertices();
     ordering.reserve(numVertices);
 
-    std::vector<std::size_t> inDegree(numVertices, 0);
+    std::vector<std::size_t> inDegree;
+    parallel_assign(inDegree, numVertices, std::size_t(0));
+
     for (Vertex v = 0; v < numVertices; ++v) {
       for (std::size_t edge = graph.beginEdge(v); edge < graph.endEdge(v);
            ++edge) {

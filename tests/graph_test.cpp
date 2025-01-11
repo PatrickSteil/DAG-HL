@@ -1,13 +1,16 @@
 /*
  * Licensed under MIT License.
  * Author: Patrick Steil
-*/
+ */
 
 #include "../datastructures/graph.h"
-#include "../datastructures/topological_sort.h"
-#include <fstream>
+
 #include <gtest/gtest.h>
+
+#include <fstream>
 #include <string>
+
+#include "../datastructures/topological_sort.h"
 
 void writeTestFile(const std::string &fileName, const std::string &content) {
   std::ofstream file(fileName);
@@ -16,42 +19,47 @@ void writeTestFile(const std::string &fileName, const std::string &content) {
 }
 
 class GraphTest : public ::testing::Test {
-protected:
+ protected:
   void SetUp() override {
-    writeTestFile("test_edge_list.txt", "1 2\n"
-                                        "1 3\n"
-                                        "2 3\n"
-                                        "3 4\n"
-                                        "4 1\n");
+    writeTestFile("test_edge_list.txt",
+                  "1 2\n"
+                  "1 3\n"
+                  "2 3\n"
+                  "3 4\n"
+                  "4 1\n");
 
-    writeTestFile("test_dimacs.txt", "c This is a test DIMACS graph file\n"
-                                     "c with comments\n"
-                                     "p edge 4 5\n"
-                                     "a 1 2\n"
-                                     "a 1 3\n"
-                                     "a 2 3\n"
-                                     "a 3 4\n"
-                                     "a 4 1\n");
+    writeTestFile("test_dimacs.txt",
+                  "c This is a test DIMACS graph file\n"
+                  "c with comments\n"
+                  "p edge 4 5\n"
+                  "a 1 2\n"
+                  "a 1 3\n"
+                  "a 2 3\n"
+                  "a 3 4\n"
+                  "a 4 1\n");
 
-    writeTestFile("test_metis.txt", "4 4\n"
-                                    "2 3\n"
-                                    "1 4\n"
-                                    "1 4\n"
-                                    "2 3\n");
+    writeTestFile("test_metis.txt",
+                  "4 4\n"
+                  "2 3\n"
+                  "1 4\n"
+                  "1 4\n"
+                  "2 3\n");
 
-    writeTestFile("test_dag.txt", "5 6\n"
-                                  "1 2\n"
-                                  "1 3\n"
-                                  "3 4\n"
-                                  "4 5\n"
-                                  "2 4\n"
-                                  "2 5\n");
+    writeTestFile("test_dag.txt",
+                  "5 6\n"
+                  "1 2\n"
+                  "1 3\n"
+                  "3 4\n"
+                  "4 5\n"
+                  "2 4\n"
+                  "2 5\n");
 
-    writeTestFile("test_cycle.txt", "4 4\n"
-                                    "1 2\n"
-                                    "2 3\n"
-                                    "3 4\n"
-                                    "4 1");
+    writeTestFile("test_cycle.txt",
+                  "4 4\n"
+                  "1 2\n"
+                  "2 3\n"
+                  "3 4\n"
+                  "4 1");
   }
 
   void TearDown() override {

@@ -1,11 +1,12 @@
 #include "../datastructures/bfs_tools.h"
 
-#include <atomic>
 #include <gtest/gtest.h>
+
+#include <atomic>
 #include <thread>
 
 class FixedSizedQueueThreadSafeTest : public ::testing::Test {
-protected:
+ protected:
   static constexpr std::size_t queueSize = 1000;
   bfs::FixedSizedQueueThreadSafe<int> queue;
 
@@ -54,8 +55,7 @@ TEST(GenerationCheckerThreadSafeTest, SequentialMarking) {
   std::vector<std::size_t> q(SIZE, 0);
 
   for (std::size_t i = 0; i < SIZE; ++i) {
-    if (checker.isMarked(i))
-      continue;
+    if (checker.isMarked(i)) continue;
     checker.mark(i);
     q[i] = i;
   }
@@ -71,8 +71,7 @@ TEST(GenerationCheckerThreadSafeTest, ConcurrentMarking) {
   std::vector<std::size_t> q(SIZE, 0);
   auto worker = [&](std::size_t thread_id) {
     for (std::size_t i = thread_id; i < SIZE; ++i) {
-      if (checker.isMarked(i))
-        continue;
+      if (checker.isMarked(i)) continue;
       checker.mark(i);
       q[i] = i;
     }
