@@ -5,25 +5,28 @@
 
 #pragma once
 #include <algorithm>
+#include <atomic>
 #include <cassert>
 #include <cstdint>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <limits>
-/* #include <locale> */
 #include <sstream>
 #include <string>
 #include <tuple>
 #include <vector>
 
+#include "ips4o.hpp"
 #include "status_log.h"
 #include "types.h"
+#include "utils.h"
 
 struct Edge {
   Vertex from;
   Vertex to;
 
+  Edge() = default;
   Edge(Vertex from, Vertex to) : from(from), to(to) {}
 
   auto operator<=>(const Edge &other) const = default;
@@ -113,11 +116,12 @@ struct Graph {
 
     adjArray.resize(maxVertex + 2, 0);
 
-    std::sort(edges.begin(), edges.end(),
-              [](const auto &left, const auto &right) {
-                return std::tie(left.first, left.second) <
-                       std::tie(right.first, right.second);
-              });
+    /* std::sort(edges.begin(), edges.end(), */
+    ips4o::parallel::sort(edges.begin(), edges.end(),
+                          [](const auto &left, const auto &right) {
+                            return std::tie(left.first, left.second) <
+                                   std::tie(right.first, right.second);
+                          });
     for (const auto &[u, v] : edges) {
       ++adjArray[u + 1];
     }
@@ -156,8 +160,9 @@ struct Graph {
         std::istringstream iss(line);
         std::string tmp;
         if (iss >> tmp >> tmp >> numVertices >> numEdges) {
-          adjArray.resize(numVertices + 1, 0);
-          toVertex.resize(numEdges, 0);
+          parallel_assign(adjArray, numVertices + 1, std::size_t(0));
+          parallel_assign(toVertex, numEdges, Vertex(0));
+          edges.reserve(numEdges);
         }
       } else if (line[0] == 'a') {
         std::istringstream iss(line);
@@ -268,25 +273,28 @@ struct Graph {
     std::vector<std::size_t> flippedAdjArray(numVertices() + 1, 0);
     std::vector<Vertex> flippedToVertex(numEdges(), noVertex);
 
-    // Count in-degrees
     for (Vertex fromV(0); fromV < numVertices(); ++fromV) {
       for (std::size_t i = adjArray[fromV]; i < adjArray[fromV + 1]; ++i) {
         flippedAdjArray[toVertex[i] + 1]++;
       }
     }
 
-    // Convert counts to prefix sums
     for (Vertex v = 1; v <= numVertices(); ++v) {
       flippedAdjArray[v] += flippedAdjArray[v - 1];
     }
 
-    // Build the reversed graph
-    std::vector<std::size_t> offset = flippedAdjArray;
+    std::vector<std::atomic_size_t> offset(flippedAdjArray.size());
 
-    for (Vertex fromV(0); fromV < numVertices(); ++fromV) {
+#pragma omp parallel for
+    for (std::size_t i = 0; i < offset.size(); ++i) {
+      offset[i].store(flippedAdjArray[i], std::memory_order_relaxed);
+    }
+
+#pragma omp parallel for schedule(static)
+    for (Vertex fromV = 0; fromV < numVertices(); ++fromV) {
       for (std::size_t i = adjArray[fromV]; i < adjArray[fromV + 1]; ++i) {
         Vertex toV = toVertex[i];
-        flippedToVertex[offset[toV]++] = fromV;
+        flippedToVertex[offset[toV].fetch_add(1)] = fromV;
       }
     }
 
@@ -295,9 +303,6 @@ struct Graph {
   }
 
   void showStats() const {
-    /* std::locale::global(std::locale("de_DE.UTF-8")); */
-    /* std::cout.imbue(std::locale()); */
-
     if (numVertices() == 0) {
       std::cout << "Graph is empty.\n";
       return;

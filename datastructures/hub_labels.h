@@ -57,7 +57,8 @@ struct Label {
 
   template <typename FUNC>
   void doForAll(FUNC &&apply) {
-    for (auto h : nodes) {
+    for (std::size_t i = 0; i < nodes.size(); ++i) {
+      auto &h = nodes[i];
       apply(h);
     }
   }
@@ -144,7 +145,8 @@ struct LabelThreadSafe : Label {
   template <typename FUNC>
   void doForAll(FUNC &&apply) {
     std::lock_guard<std::mutex> lock(mutex);
-    for (auto h : nodes) {
+    for (std::size_t i = 0; i < nodes.size(); ++i) {
+      auto &h = nodes[i];
       apply(h);
     }
   }
@@ -349,10 +351,6 @@ void sortLabels(std::array<std::vector<LABEL>, 2> &labels) {
 #pragma omp parallel for
   for (std::size_t i = 0; i < labels[FWD].size(); ++i) {
     labels[FWD][i].sort();
-  }
-
-#pragma omp parallel for
-  for (std::size_t i = 0; i < labels[BWD].size(); ++i) {
     labels[BWD][i].sort();
   }
 }

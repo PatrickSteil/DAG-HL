@@ -6,6 +6,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(CMAKE_CXX_FLAGS "-pipe -march=native -Wfatal-errors -pthread")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++20")
+
 set(CMAKE_CXX_FLAGS_RELEASE "-ffast-math -DNDEBUG -O3 -g")
 set(CMAKE_CXX_FLAGS_DEBUG "-rdynamic -Werror -Wpedantic -pedantic-errors -Wall -Wextra -D_GLIBCXX_DEBUG -g -fno-omit-frame-pointer -O0")
 set(CMAKE_CXX_FLAGS_SANITIZE "-fsanitize=address,undefined -fno-omit-frame-pointer -g -O1")
@@ -21,13 +23,11 @@ set(SOURCE_FILES
     main.cpp
 )
 
-set(HEADER_FILES
-    datastructures/bfs_tools.h
-    datastructures/pruned_landmark_labeling.h
-)
-
 add_executable(${PROJECT_NAME} ${SOURCE_FILES})
 target_include_directories(${PROJECT_NAME} PUBLIC datastructures)
+
+add_subdirectory(external/ips4o EXCLUDE_FROM_ALL)
+target_link_libraries(${PROJECT_NAME} PRIVATE ips4o)
 
 find_package(OpenMP REQUIRED)
 if(OpenMP_CXX_FOUND)
@@ -50,6 +50,7 @@ target_include_directories(unit_test PUBLIC datastructures)
 
 find_package(GTest REQUIRED)
 target_link_libraries(unit_test PRIVATE GTest::gtest_main)
+target_link_libraries(unit_test PRIVATE ips4o)
 
 if(OpenMP_CXX_FOUND)
     target_link_libraries(unit_test PUBLIC OpenMP::OpenMP_CXX)

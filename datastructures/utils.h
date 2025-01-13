@@ -130,7 +130,7 @@ std::vector<std::pair<VALUE, VALUE>> generateRandomQueries(int numQueries,
       target = minVertex + std::rand() % (maxVertex - minVertex + 1);
     }
 
-    queries.emplace_back(source, target);
+    queries.emplace_back(std::min(source, target), std::max(source, target));
   }
 
   return queries;

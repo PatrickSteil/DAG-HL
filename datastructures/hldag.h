@@ -32,6 +32,7 @@
 
 #include "graph.h"
 #include "hub_labels.h"
+#include "ips4o.hpp"
 #include "pruned_landmark_labeling.h"
 #include "status_log.h"
 #include "topological_sort.h"
@@ -231,8 +232,8 @@ struct HLDAG {
                    randomNumber[right]);
       };
 
-      std::iota(ordering.begin(), ordering.end(), 0);
-      std::sort(ordering.begin(), ordering.end(), degreeCompRandom);
+      parallel_iota(ordering, Vertex(0));
+      ips4o::parallel::sort(ordering.begin(), ordering.end(), degreeCompRandom);
     } else {
       std::ifstream file(fileName);
       if (!file.is_open()) {
@@ -295,20 +296,24 @@ struct HLDAG {
       rank[sorter.getOrdering()[i]] = i;
     }
 
-    edges.reserve(graph[FWD]->numEdges());
+    parallel_assign(edges, graph[FWD]->numEdges(), Edge(0, 0));
 
+#pragma omp parallel for schedule(static)
     for (Vertex from = 0; from < numVertices; ++from) {
+      std::size_t position = graph[FWD]->beginEdge(from);
+
       for (std::size_t i = graph[FWD]->beginEdge(from);
            i < graph[FWD]->endEdge(from); ++i) {
-        edges.emplace_back(from, graph[FWD]->toVertex[i]);
+        edges[position].from = from;
+        edges[position].to = graph[FWD]->toVertex[i];
       }
     }
 
-    std::sort(edges.begin(), edges.end(),
-              [&](const auto &left, const auto &right) {
-                return std::tie(rank[left.from], rank[left.to]) <
-                       std::tie(rank[right.from], rank[right.to]);
-              });
+    ips4o::parallel::sort(edges.begin(), edges.end(),
+                          [&](const auto &left, const auto &right) {
+                            return std::tie(rank[left.from], rank[left.to]) <
+                                   std::tie(rank[right.from], rank[right.to]);
+                          });
   }
 
   void resetReachability() {
