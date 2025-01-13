@@ -108,9 +108,7 @@ class PriorityQueue {
   }
 
   void push(Vertex v, uint32_t value) {
-    if (v >= mapper.size()) {
-      mapper.resize(v + 1, noIndexInt);
-    }
+    assert(isValid(v));
 
     if (mapper[v] == noIndexInt) {
       heap.emplace_back(value, v);

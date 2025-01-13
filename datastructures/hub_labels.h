@@ -65,7 +65,7 @@ struct Label {
 
   // toVerfiy should take (const Vertex h) as argument
   template <typename FUNC>
-  bool appliesToAny(FUNC &&toVerfiy) {
+  bool appliesToAny(FUNC &&toVerfiy) const {
     return std::any_of(nodes.begin(), nodes.end(), toVerfiy);
   }
 
@@ -152,7 +152,7 @@ struct LabelThreadSafe : Label {
   }
 
   template <typename FUNC>
-  bool appliesToAny(FUNC &&toVerfiy) {
+  bool appliesToAny(FUNC &&toVerfiy) const {
     std::lock_guard<std::mutex> lock(mutex);
     return std::any_of(nodes.begin(), nodes.end(), toVerfiy);
   }

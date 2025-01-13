@@ -93,38 +93,37 @@ struct PLL {
     setLookup(v);
 
     auto runOneDirection = [&](const DIRECTION dir) -> void {
-      bfs[dir].run(v, bfs::noOp, [&](const Vertex w) {
-        bool prune = alreadyProcessed[w].load(std::memory_order_relaxed) ||
-                     labels[!dir][w].appliesToAny([&](const Vertex h) {
-                       return (lookup[dir][h] == generation);
-                     });
-        if constexpr (PRUNE_VIA_BITSET) {
-          assert(reachability[dir][w].any());
-          assert(reachability[!dir][v].any());
+      bfs[dir].run(
+          v,
+          [&](const Vertex u) {
+            assert(!labels[!dir][u].contains(v));
+            labels[!dir][u].add(v);
+            return false;
+          },
+          [&](const Vertex /* u */, const Vertex w) {
+            bool prune = alreadyProcessed[w].load(std::memory_order_relaxed) ||
+                         labels[!dir][w].appliesToAny([&](const Vertex h) {
+                           return (lookup[dir][h] == generation);
+                         });
+            if constexpr (PRUNE_VIA_BITSET) {
+              assert(reachability[dir][w].any());
+              assert(reachability[!dir][v].any());
 
-          auto result =
-              findFirstOne(reachability[dir][w], reachability[!dir][v]);
-          prune |= (result < i);
-        }
-        return prune;
-      });
+              auto result =
+                  findFirstOne(reachability[dir][w], reachability[!dir][v]);
+              prune |= (result < i);
+            }
+            return prune;
+          });
     };
 
     for (auto dir : {FWD, BWD}) {
       runOneDirection(dir);
     }
 
-    for (auto dir : {FWD, BWD}) {
-      bfs[dir].doForAllVerticesInQ([&](const Vertex u) {
-        assert(!labels[!dir][u].contains(v));
-        labels[!dir][u].add(v);
-      });
-    }
-
     alreadyProcessed[v].store(true, std::memory_order_relaxed);
   }
 
-  // simple version
   void runPrunedBFS(const std::size_t i, const std::vector<Vertex> &ordering) {
     const Vertex v = ordering[i];
     assert(v < labels[BWD].size());
@@ -132,25 +131,24 @@ struct PLL {
     setLookup(v);
 
     auto runOneDirection = [&](const DIRECTION dir) -> void {
-      bfs[dir].run(v, bfs::noOp, [&](const Vertex w) {
-        return alreadyProcessed[w].load(std::memory_order_relaxed) ||
-               labels[!dir][w].appliesToAny([&](const Vertex h) {
-                 return (lookup[dir][h] == generation);
-               });
-      });
+      bfs[dir].run(
+          v,
+          [&](const Vertex u) {
+            assert(!labels[!dir][u].contains(v));
+            labels[!dir][u].add(v);
+            return false;
+          },
+          [&](const Vertex /* u */, const Vertex w) {
+            return alreadyProcessed[w].load(std::memory_order_relaxed) ||
+                   labels[!dir][w].appliesToAny([&](const Vertex h) {
+                     return (lookup[dir][h] == generation);
+                   });
+          });
     };
 
 #pragma omp parallel for num_threads(2)
     for (auto dir : {FWD, BWD}) {
       runOneDirection(dir);
-    }
-
-#pragma omp parallel for num_threads(2)
-    for (auto dir : {FWD, BWD}) {
-      bfs[dir].doForAllVerticesInQ([&](const Vertex u) {
-        assert(!labels[!dir][u].contains(v));
-        labels[!dir][u].add(v);
-      });
     }
 
     alreadyProcessed[v].store(true, std::memory_order_relaxed);
