@@ -37,9 +37,8 @@ struct PLL {
   std::array<std::vector<std::bitset<WIDTH>>, 2> &reachability;
   std::vector<std::atomic<bool>> &alreadyProcessed;
   std::array<const Graph *, 2> &graph;
-  std::array<std::vector<std::uint16_t>, 2> lookup;
+  std::array<std::vector<std::uint8_t>, 2> lookup;
   std::array<bfs::BFS, 2> bfs;
-  std::uint16_t generation;
 
   PLL(std::array<std::vector<LABEL>, 2> &labels,
       std::array<std::vector<std::bitset<WIDTH>>, 2> &reachability,
@@ -49,10 +48,9 @@ struct PLL {
         reachability(reachability),
         alreadyProcessed(alreadyProcessed),
         graph(graph),
-        lookup{std::vector<std::uint16_t>(graph[FWD]->numVertices(), 0),
-               std::vector<std::uint16_t>(graph[FWD]->numVertices(), 0)},
-        bfs{bfs::BFS(*graph[FWD]), bfs::BFS(*graph[BWD])},
-        generation(0){};
+        lookup{std::vector<std::uint8_t>(graph[FWD]->numVertices(), 0),
+               std::vector<std::uint8_t>(graph[FWD]->numVertices(), 0)},
+        bfs{bfs::BFS(*graph[FWD]), bfs::BFS(*graph[BWD])} {};
 
   void run(const std::vector<Vertex> &ordering) {
     StatusLog log("Computing HLs");
@@ -74,7 +72,6 @@ struct PLL {
 
     lookup[BWD].assign(numVertices, 0);
     lookup[FWD].assign(numVertices, 0);
-    generation = 1;
 
     alreadyProcessed = std::vector<std::atomic<bool>>(numVertices, false);
 
@@ -100,26 +97,27 @@ struct PLL {
             labels[!dir][u].add(v);
             return false;
           },
-          [&](const Vertex /* u */, const Vertex w) {
-            bool prune = alreadyProcessed[w].load(std::memory_order_relaxed) ||
-                         labels[!dir][w].appliesToAny([&](const Vertex h) {
-                           return (lookup[dir][h] == generation);
-                         });
+          [&](const Vertex /* u */, const Vertex w) -> bool {
             if constexpr (PRUNE_VIA_BITSET) {
               assert(reachability[dir][w].any());
               assert(reachability[!dir][v].any());
 
               auto result =
                   findFirstOne(reachability[dir][w], reachability[!dir][v]);
-              prune |= (result < i);
+
+              if (result < i) return true;
             }
-            return prune;
+
+            return alreadyProcessed[w].load(std::memory_order_relaxed) |
+                   labels[!dir][w].prune(lookup[dir]);
           });
     };
 
     for (auto dir : {FWD, BWD}) {
       runOneDirection(dir);
     }
+
+    unsetLookup(v);
 
     alreadyProcessed[v].store(true, std::memory_order_relaxed);
   }
@@ -140,9 +138,7 @@ struct PLL {
           },
           [&](const Vertex /* u */, const Vertex w) {
             return alreadyProcessed[w].load(std::memory_order_relaxed) ||
-                   labels[!dir][w].appliesToAny([&](const Vertex h) {
-                     return (lookup[dir][h] == generation);
-                   });
+                   labels[!dir][w].prune(lookup[dir]);
           });
     };
 
@@ -151,23 +147,28 @@ struct PLL {
       runOneDirection(dir);
     }
 
+    unsetLookup(v);
+
     alreadyProcessed[v].store(true, std::memory_order_relaxed);
   }
 
   void setLookup(const Vertex v) {
-    generation++;
-
-    if (generation == 0) {
-      std::fill(lookup[FWD].begin(), lookup[FWD].end(), 0);
-      std::fill(lookup[BWD].begin(), lookup[BWD].end(), 0);
-
-      generation = 1;
-    }
-
     auto forDir = [&](const DIRECTION dir) -> void {
       labels[dir][v].doForAll([&](const Vertex hub) {
         assert(hub < lookup[dir].size());
-        lookup[dir][hub] = generation;
+        lookup[dir][hub] = 1;
+      });
+    };
+
+    forDir(FWD);
+    forDir(BWD);
+  }
+
+  void unsetLookup(const Vertex v) {
+    auto forDir = [&](const DIRECTION dir) -> void {
+      labels[dir][v].doForAll([&](const Vertex hub) {
+        assert(hub < lookup[dir].size());
+        lookup[dir][hub] = 0;
       });
     };
 

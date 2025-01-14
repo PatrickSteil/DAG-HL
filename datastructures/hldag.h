@@ -307,6 +307,7 @@ struct HLDAG {
       }
     }
 
+    /* ips4o::parallel::sort(edges.begin(), edges.end(), */
     std::sort(edges.begin(), edges.end(),
               [&](const auto &left, const auto &right) {
                 return std::tie(rank[left.from], rank[left.to]) <

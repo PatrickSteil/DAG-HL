@@ -69,6 +69,20 @@ struct Label {
     return std::any_of(nodes.begin(), nodes.end(), toVerfiy);
   }
 
+  bool prune(const std::vector<std::uint8_t> &lookup) {
+    for (std::size_t i = 0; i < nodes.size(); ++i) {
+      if (i + 4 < nodes.size()) {
+        PREFETCH(&lookup[nodes[i + 4]]);
+      }
+
+      if (lookup[nodes[i]]) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
   void reserve(const std::size_t size) { nodes.reserve(size); };
 
   std::size_t size() const { return nodes.size(); };
@@ -155,6 +169,21 @@ struct LabelThreadSafe : Label {
   bool appliesToAny(FUNC &&toVerfiy) const {
     std::lock_guard<std::mutex> lock(mutex);
     return std::any_of(nodes.begin(), nodes.end(), toVerfiy);
+  }
+
+  bool prune(const std::vector<std::uint8_t> &lookup) {
+    std::lock_guard<std::mutex> lock(mutex);
+    for (std::size_t i = 0; i < nodes.size(); ++i) {
+      if (i + 4 < nodes.size()) {
+        PREFETCH(&lookup[nodes[i + 4]]);
+      }
+
+      if (lookup[nodes[i]]) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   void sort() {
