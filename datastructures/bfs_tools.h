@@ -127,8 +127,7 @@ class FixedSizedQueueThreadSafeSpinlock {
   }
 
   void push(VertexType v) {
-    std::lock_guard<spinlock> lock(
-        mutex_write);  // Use spinlock instead of std::mutex
+    std::lock_guard<Spinlock> lock(mutex_write);
     assert(write < data.size());
     data[write++] = v;
   }
@@ -175,8 +174,8 @@ class FixedSizedQueueThreadSafeSpinlock {
   }
 
  private:
-  mutable spinlock mutex_read;   // Use spinlock for thread-safety
-  mutable spinlock mutex_write;  // Use spinlock for thread-safety
+  mutable Spinlock mutex_read;
+  mutable Spinlock mutex_write;
   std::vector<VertexType> data;
   std::size_t read;
   std::size_t write;
