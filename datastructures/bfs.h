@@ -90,4 +90,87 @@ struct BFS {
   }
 };
 
+struct BFSParallelFrontier {
+  explicit BFSParallelFrontier(const Graph &graph)
+      : graph(graph),
+        seen(graph.numVertices()),
+        q(graph.numVertices()),
+        read(0),
+        write(0) {}
+
+  void reset(const std::size_t numVertices) {
+    q.resize(numVertices);
+    read.store(0);
+    write.store(0);
+
+    seen.reset();
+    seen.resize(numVertices);
+  }
+
+  void addToQueue(const Vertex v) { q[read.fetch_add(1)] = v; }
+
+  template <typename ON_POP = decltype([](const Vertex) { return false; }),
+            typename ON_RELAX = decltype([](const Vertex, const Vertex) {
+              return false;
+            })>
+  void run(const Vertex root, ON_POP &&onPop, ON_RELAX &&onRelax) {
+    read.store(0);
+    write.store(0);
+    seen.reset();
+
+    std::size_t pos = write.fetch_add(1);
+    assert(pos < q.size());
+    q[pos] = root;
+    seen.mark(root);
+
+    while (read.load(std::memory_order_acquire) <
+           write.load(std::memory_order_acquire)) {
+      processLevel(std::forward<ON_POP>(onPop),
+                   std::forward<ON_RELAX>(onRelax));
+    }
+
+    assert(read.load() == write.load());
+  }
+
+  template <typename ON_POP, typename ON_RELAX>
+  void processLevel(ON_POP &&onPop, ON_RELAX &&onRelax) {
+    std::size_t left = read.load(std::memory_order_acquire);
+    std::size_t right = write.load(std::memory_order_acquire);
+
+    assert(left <= right);
+    assert(right < q.size());
+
+#pragma omp parallel for schedule(dynamic, 8)
+    for (std::size_t i = left; i < right; ++i) {
+      const Vertex u = q[i];
+
+      if (onPop(u)) continue;
+
+      for (std::size_t i = graph.beginEdge(u), end = graph.endEdge(u); i < end;
+           ++i) {
+        const Vertex w = graph.toVertex[i];
+
+        if (seen.isMarked(w)) continue;
+        seen.mark(w);
+
+        if (onRelax(u, w)) {
+          continue;
+        }
+
+        std::size_t pos = write.fetch_add(1);
+        assert(pos < q.size());
+        q[pos] = w;
+      }
+    }
+
+    read.store(right, std::memory_order_release);
+  }
+
+  const Graph &graph;
+  GenerationCheckerThreadSafe<> seen;
+  std::vector<Vertex> q;
+  std::atomic_size_t read;
+  std::atomic_size_t write;
+};
+
 };  // namespace bfs

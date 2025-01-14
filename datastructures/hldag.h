@@ -233,7 +233,9 @@ struct HLDAG {
       };
 
       parallel_iota(ordering, Vertex(0));
-      ips4o::parallel::sort(ordering.begin(), ordering.end(), degreeCompRandom);
+      /* ips4o::parallel::sort(ordering.begin(), ordering.end(),
+       * degreeCompRandom); */
+      std::sort(ordering.begin(), ordering.end(), degreeCompRandom);
     } else {
       std::ifstream file(fileName);
       if (!file.is_open()) {
@@ -296,24 +298,20 @@ struct HLDAG {
       rank[sorter.getOrdering()[i]] = i;
     }
 
-    parallel_assign(edges, graph[FWD]->numEdges(), Edge(0, 0));
+    edges.reserve(graph[FWD]->numEdges());
 
-#pragma omp parallel for schedule(static)
     for (Vertex from = 0; from < numVertices; ++from) {
-      std::size_t position = graph[FWD]->beginEdge(from);
-
       for (std::size_t i = graph[FWD]->beginEdge(from);
            i < graph[FWD]->endEdge(from); ++i) {
-        edges[position].from = from;
-        edges[position].to = graph[FWD]->toVertex[i];
+        edges.emplace_back(from, graph[FWD]->toVertex[i]);
       }
     }
 
-    ips4o::parallel::sort(edges.begin(), edges.end(),
-                          [&](const auto &left, const auto &right) {
-                            return std::tie(rank[left.from], rank[left.to]) <
-                                   std::tie(rank[right.from], rank[right.to]);
-                          });
+    std::sort(edges.begin(), edges.end(),
+              [&](const auto &left, const auto &right) {
+                return std::tie(rank[left.from], rank[left.to]) <
+                       std::tie(rank[right.from], rank[right.to]);
+              });
   }
 
   void resetReachability() {
