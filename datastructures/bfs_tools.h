@@ -13,6 +13,7 @@
 #include <mutex>
 #include <vector>
 
+#include "spinlock.h"
 #include "utils.h"
 
 namespace bfs {
@@ -102,6 +103,80 @@ class FixedSizedQueueThreadSafe {
  private:
   mutable std::mutex mutex_read;
   mutable std::mutex mutex_write;
+  std::vector<VertexType> data;
+  std::size_t read;
+  std::size_t write;
+};
+
+template <typename VertexType = std::uint64_t>
+class FixedSizedQueueThreadSafeSpinlock {
+ public:
+  explicit FixedSizedQueueThreadSafeSpinlock(std::size_t size = 0)
+      : data(size), read(0), write(0) {}
+
+  void resize(std::size_t size) {
+    mutex_read.lock();
+    mutex_write.lock();
+
+    data.resize(size);
+    read = 0;
+    write = 0;
+
+    mutex_write.unlock();
+    mutex_read.unlock();
+  }
+
+  void push(VertexType v) {
+    std::lock_guard<spinlock> lock(
+        mutex_write);  // Use spinlock instead of std::mutex
+    assert(write < data.size());
+    data[write++] = v;
+  }
+
+  VertexType pop() {
+    mutex_read.lock();
+    mutex_write.lock();
+
+    if (read == write) [[unlikely]] {
+      mutex_write.unlock();
+      mutex_read.unlock();
+      return static_cast<VertexType>(-1);
+    }
+
+    VertexType value = data[read++];
+
+    mutex_write.unlock();
+    mutex_read.unlock();
+
+    return value;
+  }
+
+  bool isEmpty() const {
+    mutex_read.lock();
+    mutex_write.lock();
+
+    bool result = (read == write);
+
+    mutex_write.unlock();
+    mutex_read.unlock();
+
+    return result;
+  }
+
+  void reset() {
+    mutex_read.lock();
+    mutex_write.lock();
+
+    read = 0;
+    write = 0;
+
+    mutex_write.unlock();
+    mutex_read.unlock();
+  }
+
+ private:
+  mutable spinlock mutex_read;   // Use spinlock for thread-safety
+  mutable spinlock mutex_write;  // Use spinlock for thread-safety
   std::vector<VertexType> data;
   std::size_t read;
   std::size_t write;

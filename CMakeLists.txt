@@ -9,7 +9,7 @@ set(CMAKE_CXX_FLAGS "-pipe -march=native -Wfatal-errors -pthread")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++20")
 
 set(CMAKE_CXX_FLAGS_RELEASE "-ffast-math -DNDEBUG -O3 -g")
-set(CMAKE_CXX_FLAGS_DEBUG "-rdynamic -Werror -Wpedantic -pedantic-errors -Wall -Wextra -D_GLIBCXX_DEBUG -g -fno-omit-frame-pointer -O0")
+set(CMAKE_CXX_FLAGS_DEBUG "-rdynamic -Werror -Wpedantic -pedantic-errors -Wall -Wextra -g -fno-omit-frame-pointer -O0")
 set(CMAKE_CXX_FLAGS_SANITIZE "-fsanitize=address,undefined -fno-omit-frame-pointer -g -O1")
 set(CMAKE_LINKER_FLAGS_SANITIZE "-fsanitize=address,undefined")
 
@@ -58,3 +58,17 @@ endif()
 
 add_test(NAME unit_test COMMAND unit_test)
 
+add_executable(benchmark_queue benchmark/queue_bench.cpp)
+target_include_directories(benchmark_queue PUBLIC datastructures benchmark)
+
+find_package(benchmark REQUIRED)
+if(benchmark_FOUND)
+    target_link_libraries(benchmark_queue PRIVATE benchmark::benchmark benchmark::benchmark_main)
+else()
+    message(FATAL_ERROR "Google Benchmark requested but not found")
+endif()
+
+target_link_libraries(benchmark_queue PRIVATE ips4o)
+if(OpenMP_CXX_FOUND)
+    target_link_libraries(benchmark_queue PUBLIC OpenMP::OpenMP_CXX)
+endif()
