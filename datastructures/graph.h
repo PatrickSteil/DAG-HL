@@ -109,12 +109,6 @@ struct Graph {
         continue;
       }
 
-      u = (u < v ? u : v);
-      v = (u < v ? v : u);
-
-      if (u == v) [[unlikely]]
-        continue;
-
       edges.emplace_back(u - 1, v - 1);
       maxVertex = std::max({maxVertex, u - 1, v - 1});
     }
@@ -175,12 +169,6 @@ struct Graph {
         char a;
         Vertex u, v;
         if (iss >> a >> u >> v) {
-          u = (u < v ? u : v);
-          v = (u < v ? v : u);
-
-          if (u == v) [[unlikely]]
-            continue;
-
           edges.emplace_back(u - 1, v - 1);
         }
       }
