@@ -385,8 +385,8 @@ void sortLabels(std::array<std::vector<LABEL>, 2> &labels) {
 }
 
 template <class LABEL = Label>
-void benchmark(std::array<std::vector<LABEL>, 2> &labels,
-               const std::size_t numQueries) {
+void benchmark_hublabels(std::array<std::vector<LABEL>, 2> &labels,
+                         const std::size_t numQueries) {
   using std::chrono::duration;
   using std::chrono::duration_cast;
   using std::chrono::high_resolution_clock;

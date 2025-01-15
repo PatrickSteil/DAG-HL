@@ -1,21 +1,16 @@
 #!/usr/bin/bash
+#
+max_cores=$(nproc)
 
-rm -rf build-release
-mkdir build-release
+for dimacs_file in data/*.dimacs; do
+    echo "Processing file: $dimacs_file"
 
-cd build-release
-cmake -DCMAKE_BUILD_TYPE=Release ..
-make
-cd ..
+    threads=1
+    while [ $threads -le $max_cores ]; do
+        echo "Running with $threads threads"
 
-timestamp=$(date +"%Y%m%d_%H%M%S")
+        ./build-release/DAGHL -i "$dimacs_file" -t "$threads"
 
-for file in data/*.dimacs; do
-    if [ -f "$file" ]; then
-        base_name=$(basename "$file")
-        echo "Starting Hub Label for $file!";
-        ./build-release/DAGHL -i "$file" -s -b -t 6 > "result/${base_name%.txt}_${timestamp}.log"
-        echo "Finished Hub Label for $file!";
-    fi
-done; 
-
+        threads=$((threads * 2))
+    done
+done

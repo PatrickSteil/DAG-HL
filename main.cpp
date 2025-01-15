@@ -86,7 +86,7 @@ int main(int argc, char *argv[]) {
   if (outputFileName != "") saveToFile(hl.labels, outputFileName);
 
   if (run_benchmark) {
-    benchmark(hl.labels, 10000);
+    benchmark_hublabels(hl.labels, 10000);
   }
   return 0;
 }
