@@ -98,18 +98,18 @@ struct PLL {
             return false;
           },
           [&](const Vertex /* u */, const Vertex w) -> bool {
+            bool prune = alreadyProcessed[w].load(std::memory_order_relaxed);
             if constexpr (PRUNE_VIA_BITSET) {
               assert(reachability[dir][w].any());
               assert(reachability[!dir][v].any());
 
-              auto result =
-                  findFirstOne(reachability[dir][w], reachability[!dir][v]);
-
-              if (result < i) return true;
+              prune |= (findFirstOne(reachability[dir][w],
+                                     reachability[!dir][v]) < i);
             }
 
-            return alreadyProcessed[w].load(std::memory_order_relaxed) |
-                   labels[!dir][w].prune(lookup[dir]);
+            if (prune) return true;
+
+            return labels[!dir][w].prune(lookup[dir]);
           });
     };
 

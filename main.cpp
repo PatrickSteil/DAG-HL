@@ -51,6 +51,8 @@ int main(int argc, char *argv[]) {
     return -1;
   }
 
+  omp_set_num_threads(numThreads);
+
   Graph g;
   g.readDimacs(inputFileName);
 
@@ -58,6 +60,8 @@ int main(int argc, char *argv[]) {
     std::cout << "Forward ";
     g.showStats();
   }
+
+  bfs::BFSParallelFrontier bfs(g, numThreads);
 
   Graph rev = g.reverseGraph();
 

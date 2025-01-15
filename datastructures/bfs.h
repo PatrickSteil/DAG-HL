@@ -91,10 +91,11 @@ struct BFS {
 };
 
 struct BFSParallelFrontier {
-  explicit BFSParallelFrontier(const Graph &graph)
+  explicit BFSParallelFrontier(const Graph &graph, const int numThreads)
       : graph(graph),
         seen(graph.numVertices()),
         q(graph.numVertices()),
+        local_cache(numThreads),
         read(0),
         write(0) {}
 
@@ -118,7 +119,7 @@ struct BFSParallelFrontier {
     write.store(0);
     seen.reset();
 
-    std::size_t pos = write.fetch_add(1);
+    std::size_t pos = write.fetch_add(1, std::memory_order_release);
     assert(pos < q.size());
     q[pos] = root;
     seen.mark(root);
@@ -138,11 +139,15 @@ struct BFSParallelFrontier {
     std::size_t right = write.load(std::memory_order_acquire);
 
     assert(left <= right);
-    assert(right < q.size());
+    // if right == q.size(), then we already added all the vertices to the queue
+    assert(right <= q.size());
 
-#pragma omp parallel for schedule(dynamic, 8)
+#pragma omp parallel for schedule(dynamic, 4)
     for (std::size_t i = left; i < right; ++i) {
       const Vertex u = q[i];
+
+      int tId = omp_get_thread_num();
+      auto &myCache = local_cache[tId];
 
       if (onPop(u)) continue;
 
@@ -157,18 +162,23 @@ struct BFSParallelFrontier {
           continue;
         }
 
-        std::size_t pos = write.fetch_add(1);
-        assert(pos < q.size());
-        q[pos] = w;
+        myCache.push_back(w);
       }
+      if (myCache.empty()) continue;
+      std::size_t pos =
+          write.fetch_add(myCache.size(), std::memory_order_release);
+      assert(pos + myCache.size() <= q.size());
+      std::copy(myCache.begin(), myCache.end(), q.begin() + pos);
+      myCache.clear();
     }
-
     read.store(right, std::memory_order_release);
   }
 
   const Graph &graph;
   GenerationCheckerThreadSafe<> seen;
   std::vector<Vertex> q;
+
+  std::vector<std::vector<Vertex>> local_cache;
   std::atomic_size_t read;
   std::atomic_size_t write;
 };
