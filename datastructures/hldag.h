@@ -233,9 +233,9 @@ struct HLDAG {
       };
 
       parallel_iota(ordering, Vertex(0));
-      /* ips4o::parallel::sort(ordering.begin(), ordering.end(),
-       * degreeCompRandom); */
-      std::sort(ordering.begin(), ordering.end(), degreeCompRandom);
+      ips4o::parallel::sort(ordering.begin(), ordering.end(), degreeCompRandom);
+      assert(
+          std::is_sorted(ordering.begin(), ordering.end(), degreeCompRandom));
     } else {
       std::ifstream file(fileName);
       if (!file.is_open()) {
@@ -307,12 +307,16 @@ struct HLDAG {
       }
     }
 
-    /* ips4o::parallel::sort(edges.begin(), edges.end(), */
-    std::sort(edges.begin(), edges.end(),
-              [&](const auto &left, const auto &right) {
-                return std::tie(rank[left.from], rank[left.to]) <
-                       std::tie(rank[right.from], rank[right.to]);
-              });
+    ips4o::parallel::sort(edges.begin(), edges.end(),
+                          [&](const auto &left, const auto &right) {
+                            return std::tie(rank[left.from], rank[left.to]) <
+                                   std::tie(rank[right.from], rank[right.to]);
+                          });
+    assert(std::is_sorted(edges.begin(), edges.end(),
+                          [&](const auto &left, const auto &right) {
+                            return std::tie(rank[left.from], rank[left.to]) <
+                                   std::tie(rank[right.from], rank[right.to]);
+                          }));
   }
 
   void resetReachability() {

@@ -61,8 +61,6 @@ int main(int argc, char *argv[]) {
     g.showStats();
   }
 
-  bfs::BFSParallelFrontier bfs(g, numThreads);
-
   Graph rev = g.reverseGraph();
 
   HLDAG<K, LabelThreadSafe> hl(g, rev, numThreads);

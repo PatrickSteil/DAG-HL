@@ -38,15 +38,6 @@ else()
     message(FATAL_ERROR "OpenMP requested but not found")
 endif()
 
-add_executable(bench bench.cpp)
-target_include_directories(bench PUBLIC datastructures)
-
-target_link_libraries(bench PRIVATE ips4o)
-
-if(OpenMP_CXX_FOUND)
-    target_link_libraries(bench PUBLIC OpenMP::OpenMP_CXX)
-endif()
-
 enable_testing()
 
 add_executable(unit_test 
