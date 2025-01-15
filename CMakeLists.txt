@@ -38,6 +38,15 @@ else()
     message(FATAL_ERROR "OpenMP requested but not found")
 endif()
 
+add_executable(bench bench.cpp)
+target_include_directories(bench PUBLIC datastructures)
+
+target_link_libraries(bench PRIVATE ips4o)
+
+if(OpenMP_CXX_FOUND)
+    target_link_libraries(bench PUBLIC OpenMP::OpenMP_CXX)
+endif()
+
 enable_testing()
 
 add_executable(unit_test 
@@ -58,17 +67,17 @@ endif()
 
 add_test(NAME unit_test COMMAND unit_test)
 
-add_executable(benchmark_queue benchmark/queue_bench.cpp)
-target_include_directories(benchmark_queue PUBLIC datastructures benchmark)
+# add_executable(benchmark_queue benchmark/queue_bench.cpp)
+# target_include_directories(benchmark_queue PUBLIC datastructures benchmark)
 
-find_package(benchmark REQUIRED)
-if(benchmark_FOUND)
-    target_link_libraries(benchmark_queue PRIVATE benchmark::benchmark benchmark::benchmark_main)
-else()
-    message(FATAL_ERROR "Google Benchmark requested but not found")
-endif()
+# find_package(benchmark REQUIRED)
+# if(benchmark_FOUND)
+#     target_link_libraries(benchmark_queue PRIVATE benchmark::benchmark benchmark::benchmark_main)
+# else()
+#     message(FATAL_ERROR "Google Benchmark requested but not found")
+# endif()
 
-target_link_libraries(benchmark_queue PRIVATE ips4o)
-if(OpenMP_CXX_FOUND)
-    target_link_libraries(benchmark_queue PUBLIC OpenMP::OpenMP_CXX)
-endif()
+# target_link_libraries(benchmark_queue PRIVATE ips4o)
+# if(OpenMP_CXX_FOUND)
+#     target_link_libraries(benchmark_queue PUBLIC OpenMP::OpenMP_CXX)
+# endif()
