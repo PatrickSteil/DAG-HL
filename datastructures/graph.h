@@ -108,6 +108,13 @@ struct Graph {
       if (!(iss >> u >> v)) {
         continue;
       }
+
+      u = (u < v ? u : v);
+      v = (u < v ? v : u);
+
+      if (u == v) [[unlikely]]
+        continue;
+
       edges.emplace_back(u - 1, v - 1);
       maxVertex = std::max({maxVertex, u - 1, v - 1});
     }
@@ -116,7 +123,6 @@ struct Graph {
 
     adjArray.resize(maxVertex + 2, 0);
 
-    /* std::sort(edges.begin(), edges.end(), */
     ips4o::parallel::sort(edges.begin(), edges.end(),
                           [](const auto &left, const auto &right) {
                             return std::tie(left.first, left.second) <
@@ -169,6 +175,12 @@ struct Graph {
         char a;
         Vertex u, v;
         if (iss >> a >> u >> v) {
+          u = (u < v ? u : v);
+          v = (u < v ? v : u);
+
+          if (u == v) [[unlikely]]
+            continue;
+
           edges.emplace_back(u - 1, v - 1);
         }
       }
@@ -188,6 +200,8 @@ struct Graph {
     for (std::size_t i = 1; i < adjArray.size(); ++i) {
       adjArray[i] += adjArray[i - 1];
     }
+
+    adjArray.back() = edges.size();
 
     toVertex.resize(edges.size());
     std::vector<std::size_t> offset = adjArray;
@@ -256,6 +270,71 @@ struct Graph {
     if (toVertex.size() != 2 * numEdges) {
       throw std::runtime_error(
           "Invalid METIS file format: edge count mismatch");
+    }
+  }
+
+  void readSnap(const std::string &fileName) {
+    StatusLog log("Reading graph from .snap format");
+    clear();
+
+    std::ifstream file(fileName);
+    if (!file.is_open()) {
+      throw std::runtime_error("Cannot open file: " + fileName);
+    }
+
+    std::vector<std::pair<Vertex, Vertex>> edges;
+    Vertex maxVertex = 0;
+
+    std::string line;
+    while (std::getline(file, line)) {
+      if (line.empty() || line[0] == '#') {
+        continue;
+      }
+
+      std::istringstream iss(line);
+      Vertex u, v;
+      if (!(iss >> u >> v)) {
+        throw std::runtime_error("Invalid line format in .snap file: " + line);
+      }
+
+      u = (u < v ? u : v);
+      v = (u < v ? v : u);
+
+      if (u == v) [[unlikely]]
+        continue;
+
+      edges.emplace_back(u, v);
+      maxVertex = std::max(maxVertex, v);
+    }
+
+    file.close();
+
+    adjArray.resize(maxVertex + 2, 0);
+
+    ips4o::parallel::sort(edges.begin(), edges.end(),
+                          [](const auto &left, const auto &right) {
+                            return std::tie(left.first, left.second) <
+                                   std::tie(right.first, right.second);
+                          });
+
+    auto it = std::unique(edges.begin(), edges.end());
+    edges.erase(it, edges.end());
+
+    for (const auto &[u, v] : edges) {
+      ++adjArray[u + 1];
+    }
+
+    for (std::size_t i = 1; i < adjArray.size(); ++i) {
+      adjArray[i] += adjArray[i - 1];
+    }
+
+    adjArray.back() = edges.size();
+
+    toVertex.resize(edges.size());
+    std::vector<std::size_t> offset = adjArray;
+
+    for (const auto &[u, v] : edges) {
+      toVertex[offset[u]++] = v;
     }
   }
 

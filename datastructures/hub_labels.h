@@ -196,6 +196,11 @@ struct LabelThreadSafe : Label {
 template <class LABEL = Label>
 bool query(std::array<std::vector<LABEL>, 2> &labels, const Vertex from,
            const Vertex to) {
+  assert(from < labels[FWD].size());
+  assert(from < labels[BWD].size());
+  assert(to < labels[FWD].size());
+  assert(to < labels[BWD].size());
+
   if (from == to) [[unlikely]]
     return true;
   std::size_t i = 0;
@@ -205,6 +210,8 @@ bool query(std::array<std::vector<LABEL>, 2> &labels, const Vertex from,
   const auto &toLabels = labels[BWD][to];
 
   while (i < fromLabels.size() && j < toLabels.size()) {
+    assert(i < fromLabels.size());
+    assert(j < toLabels.size());
     if (fromLabels[i] == toLabels[j]) return true;
 
     if (fromLabels[i] < toLabels[j]) {

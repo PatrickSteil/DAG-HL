@@ -123,8 +123,8 @@ std::vector<std::pair<VALUE, VALUE>> generateRandomQueries(int numQueries,
   std::srand(42);
 
   for (int i = 0; i < numQueries; ++i) {
-    VALUE source = minVertex + std::rand() % (maxVertex - minVertex + 1);
-    VALUE target = minVertex + std::rand() % (maxVertex - minVertex + 1);
+    VALUE source = minVertex + std::rand() % (maxVertex - minVertex);
+    VALUE target = minVertex + std::rand() % (maxVertex - minVertex);
 
     while (source == target) {
       target = minVertex + std::rand() % (maxVertex - minVertex + 1);
