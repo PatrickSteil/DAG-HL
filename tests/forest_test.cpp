@@ -3,7 +3,8 @@
 #include <gtest/gtest.h>
 
 TEST(EdgeTreeTest, BasicOperations) {
-  EdgeTree<std::vector<Index>> tree(10);
+  std::vector<Index> topoRank = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+  EdgeTree<std::vector<Index>> tree(10, topoRank);
   tree.setRoot(0);
   tree.addEdge(0, 1, FWD);
   tree.addEdge(0, 2, FWD);
@@ -20,7 +21,8 @@ TEST(EdgeTreeTest, BasicOperations) {
 }
 
 TEST(EdgeTreeTest, ComputeDescendants) {
-  EdgeTree<std::vector<Index>> tree(5);
+  std::vector<Index> topoRank = {0, 1, 2, 3, 4};
+  EdgeTree<std::vector<Index>> tree(5, topoRank);
   tree.setRoot(0);
   tree.addEdge(0, 1, FWD);
   tree.addEdge(0, 2, FWD);
@@ -34,14 +36,15 @@ TEST(EdgeTreeTest, ComputeDescendants) {
 }
 
 TEST(ForestTest, TreeManagement) {
-  Forest forest(10);
+  std::vector<Index> topoRank = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+  Forest forest(10, topoRank);
   EXPECT_EQ(forest.numVertices, 10);
 
   std::size_t tree1_index = forest.newTree();
   std::size_t tree2_index = forest.newTree();
 
-  auto& tree1 = forest.getTree(tree1_index);
-  auto& tree2 = forest.getTree(tree2_index);
+  auto& tree1 = forest[tree1_index];
+  auto& tree2 = forest[tree2_index];
 
   EXPECT_EQ(tree1.capacity(), 10);
   EXPECT_EQ(tree2.capacity(), 10);
@@ -56,10 +59,33 @@ TEST(ForestTest, TreeManagement) {
   tree2.addEdge(5, 6, FWD);
 
   forest.computeSubtreeSizes();
-  EXPECT_GT(tree1.getOrDefault(0), 0);
-  EXPECT_GT(tree2.getOrDefault(5), 0);
+  EXPECT_EQ(tree1.getOrDefault(0), 2);
+  EXPECT_EQ(tree2.getOrDefault(5), 1);
 
   forest.removeSubtreesAtVertex(0);
+  EXPECT_EQ(tree1.getOrDefault(0), 0);
+  EXPECT_EQ(tree2.getOrDefault(5), 1);
+
   forest.removeTreesWithNoEdges();
   EXPECT_EQ(forest.numberOfTrees(), 1);
+
+  std::size_t tree3_index = forest.newTree();
+  auto& tree3 = forest[tree3_index];
+
+  auto& tree2_new = forest[0];
+
+  tree3.setRoot(2);
+  tree3.addEdge(2, 3, FWD);
+  tree3.addEdge(2, 5, FWD);
+  tree3.addEdge(5, 6, FWD);
+
+  tree3.addEdge(2, 1, BWD);
+
+  forest.computeSubtreeSizes();
+  EXPECT_EQ(tree2_new.getOrDefault(5), 1);
+  EXPECT_EQ(tree3.getOrDefault(2), 4);
+  EXPECT_EQ(tree3.getOrDefault(3), 0);
+  EXPECT_EQ(tree3.getOrDefault(4), 0);
+  EXPECT_EQ(tree3.getOrDefault(5), 1);
+  EXPECT_EQ(tree3.getOrDefault(6), 0);
 }

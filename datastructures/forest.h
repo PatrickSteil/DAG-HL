@@ -8,6 +8,7 @@
 #include <omp.h>
 
 #include <array>
+#include <functional>
 #include <unordered_map>
 #include <vector>
 
@@ -22,6 +23,14 @@
  * Note that this datastructure was implemented to work efficiently with DAGs,
  * "Undefined behaviour" if the underlying graph (from which we sample the FWD
  * and BWD tree) is not a DAG.
+ * The main idea is not to store a parent array, as operations to compute the
+ * subtree size and removing subtrees are rather 'unhandy' when using with
+ * parent pointers. Also, due to memory consumption, we don't want to store a
+ * vector<vector<Vertex>>. Instead, we store the edge list (which by
+ * construction of the DAG which we sample from) respects the topological
+ * ordering. Hence we can use dynamic programs to compute subtree sizes, as well
+ * as removing subtrees whilst updating the descendants count. The runtime for
+ * such a sweeo is O(|E(T)|), where E(T) are the edges we store.
  */
 template <typename STORAGE>
 class EdgeTree {
@@ -40,11 +49,15 @@ class EdgeTree {
   // Stores the number of descendants per vertex
   STORAGE descendants;
 
+  // Maps each vertex to its topological rank
+  std::reference_wrapper<const std::vector<Index>> topoRank;
+
   // Root of the tree
   Vertex root;
 
   // Constructor - initializes storage if using a vector
-  explicit EdgeTree(std::size_t numVertices) : descendants(numVertices, 0) {}
+  explicit EdgeTree(std::size_t numVertices, const std::vector<Index>& topoRank)
+      : descendants(numVertices, 0), topoRank(topoRank) {}
 
   EdgeTree(EdgeTree&& other) = default;
   EdgeTree& operator=(EdgeTree&& other) = default;
@@ -90,6 +103,8 @@ class EdgeTree {
       assert(from < descendants.size());
       assert(to < descendants.size());
     }
+    assert(!(dir == FWD) || topoRank.get()[from] < topoRank.get()[to]);
+    assert(!(dir == BWD) || topoRank.get()[to] < topoRank.get()[from]);
     edges[dir].emplace_back(from, to);
   }
 
@@ -111,19 +126,32 @@ class EdgeTree {
     runForDir(BWD);
   }
 
+  void clearDescendants() {
+    if constexpr (isVectorStorage) {
+      std::fill(descendants.begin(), descendants.end(), 0);
+    } else {
+      descendants.clear();
+    }
+  }
+
   // Removes a subtree rooted at vertex 'v'
   void removeSubtree(Vertex v) {
     // If removing the root, clear everything
     if (v == getRoot()) {
       edges[FWD].clear();
       edges[BWD].clear();
-      if constexpr (isVectorStorage) {
-        std::fill(descendants.begin(), descendants.end(), 0);
-      } else {
-        descendants.clear();
-      }
+      clearDescendants();
       return;
     }
+
+    // if the vertex is not in the tree / or a leaf, no nothing
+    if (getOrDefault(v) == 0) {
+      return;
+    }
+
+    // Process only the direction where the vertex could be
+    const DIRECTION dir =
+        (topoRank.get()[getRoot()] < topoRank.get()[v] ? FWD : BWD);
 
     auto runForDir = [&](const DIRECTION dir) -> void {
       for (std::size_t i = 0; i < edges[dir].size(); ++i) {
@@ -146,10 +174,10 @@ class EdgeTree {
                        edges[dir].end());
     };
 
-    // Process both directions
-    runForDir(FWD);
-    runForDir(BWD);
+    runForDir(dir);
 
+    // TODO: this could probably be done more efficiently, maybe do not reset
+    // here, but rather when we access the value?
     if constexpr (isVectorStorage) {
       for (std::size_t i = 0; i < descendants.size(); ++i) {
         auto& val = descendants[i];
@@ -162,7 +190,8 @@ class EdgeTree {
     }
   }
 
-  // Applies a function to all vertices and their descendant counts
+  // Applies a function to all vertices and their descendant counts.
+  // func takes two parameters: Vertex v, Index descendant counter for v
   template <typename FUNC>
   void doForAllVerticesAndDescendants(const FUNC&& func) const {
     if constexpr (isVectorStorage) {
@@ -194,37 +223,66 @@ class EdgeTree {
  */
 struct Forest {
   std::vector<EdgeTree<std::vector<Index>>> trees;
+
+  // Maps each vertex to its topological rank
+  std::reference_wrapper<const std::vector<Index>> topoRank;
+
   std::size_t numVertices;
 
-  Forest(const std::size_t numVerticesNew)
-      : trees(), numVertices(numVerticesNew) {
+  Forest(const std::size_t numVerticesNew, const std::vector<Index>& topoRank)
+      : trees(), topoRank(topoRank), numVertices(numVerticesNew) {
     trees.reserve(32);
   };
 
   Forest(Forest&& other) noexcept
-      : trees(std::move(other.trees)), numVertices(other.numVertices) {}
+      : trees(std::move(other.trees)),
+        topoRank(other.topoRank),
+        numVertices(other.numVertices) {}
 
+  // Returns the index of the newTree.
   std::size_t newTree() {
     assert(numVertices > 0);
-    trees.emplace_back(numVertices);
+    trees.emplace_back(numVertices, topoRank);
     return trees.size() - 1;
   }
 
-  EdgeTree<std::vector<Index>>& getTree(const std::size_t i) {
+  // Access the i'th tree.
+  EdgeTree<std::vector<Index>>& operator[](const std::size_t i) noexcept {
     assert(i < trees.size());
     return trees[i];
   }
 
-  std::size_t numberOfTrees() const { return trees.size(); }
+  // Access the i'th tree.
+  const EdgeTree<std::vector<Index>>& operator[](
+      const std::size_t i) const noexcept {
+    assert(i < trees.size());
+    return trees[i];
+  }
 
+  // Access the i'th tree.
+  EdgeTree<std::vector<Index>>& getTree(const std::size_t i) noexcept {
+    assert(i < trees.size());
+    return trees[i];
+  }
+
+  // Returns the current number of trees in this forest.
+  std::size_t numberOfTrees() const noexcept { return trees.size(); }
+
+  // Calls computeDescendants for each tree.
+  // Parameter allows to specify the number of threads to use (trivial
+  // parallelism: two trees are independent from each other)
   void computeSubtreeSizes(const int numThreads = 1) {
 #pragma omp parallel for schedule(dynamic) num_threads(numThreads)
     for (std::size_t t = 0; t < trees.size(); ++t) {
       auto& tree = trees[t];
+      tree.clearDescendants();
       tree.computeDescendants();
     }
   }
 
+  // Calls removeSubtree(v) for each tree.
+  // Parameter allows to specify the number of threads to use (trivial
+  // parallelism: two trees are independent from each other)
   void removeSubtreesAtVertex(const Vertex v, const int numThreads = 1) {
 #pragma omp parallel for schedule(dynamic) num_threads(numThreads)
     for (std::size_t t = 0; t < trees.size(); ++t) {
@@ -233,6 +291,7 @@ struct Forest {
     }
   }
 
+  // Removes all trees which are empty.
   void removeTreesWithNoEdges() {
     trees.erase(
         std::remove_if(trees.begin(), trees.end(),
@@ -240,8 +299,12 @@ struct Forest {
         trees.end());
   }
 
+  // Clears the trees, but keeps the information about number of vertices and so
+  // on.
   void clear() { trees.clear(); }
 
+  // Resets everything, i.e., no more trees and no information about the number
+  // of vertices in the 'overlaying' graph.
   void reset(std::size_t numVerticesNew) {
     numVertices = numVerticesNew;
     trees.clear();
