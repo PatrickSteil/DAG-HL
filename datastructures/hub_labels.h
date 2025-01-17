@@ -23,11 +23,10 @@
 #include <vector>
 
 #include "priority_queue.h"
+#include "spinlock.h"
 #include "status_log.h"
 #include "types.h"
 #include "utils.h"
-
-enum DIRECTION : bool { FWD, BWD };
 
 struct Label {
   Label(){};
@@ -122,7 +121,8 @@ struct Label {
 };
 
 struct LabelThreadSafe : Label {
-  mutable std::mutex mutex;
+  mutable Spinlock mutex;
+  /* mutable std::mutex mutex; */
 
   LabelThreadSafe() {}
 
@@ -132,7 +132,8 @@ struct LabelThreadSafe : Label {
 
   LabelThreadSafe &operator=(const LabelThreadSafe &other) {
     if (this != &other) {
-      std::lock_guard<std::mutex> lock(mutex);
+      std::lock_guard<Spinlock> lock(mutex);
+      /* std::lock_guard<std::mutex> lock(mutex); */
       Label::operator=(other);
     }
     return *this;
@@ -140,25 +141,29 @@ struct LabelThreadSafe : Label {
 
   LabelThreadSafe &operator=(LabelThreadSafe &&other) noexcept {
     if (this != &other) {
-      std::lock_guard<std::mutex> lock(mutex);
+      std::lock_guard<Spinlock> lock(mutex);
+      /* std::lock_guard<std::mutex> lock(mutex); */
       Label::operator=(std::move(other));
     }
     return *this;
   }
 
   void add(const Vertex hub) {
-    std::lock_guard<std::mutex> lock(mutex);
+    std::lock_guard<Spinlock> lock(mutex);
+    /* std::lock_guard<std::mutex> lock(mutex); */
     nodes.push_back(hub);
   };
 
   bool contains(const Vertex hub) {
-    std::lock_guard<std::mutex> lock(mutex);
+    std::lock_guard<Spinlock> lock(mutex);
+    /* std::lock_guard<std::mutex> lock(mutex); */
     return std::find(nodes.begin(), nodes.end(), hub) != nodes.end();
   };
 
   template <typename FUNC>
   void doForAll(FUNC &&apply) {
-    std::lock_guard<std::mutex> lock(mutex);
+    std::lock_guard<Spinlock> lock(mutex);
+    /* std::lock_guard<std::mutex> lock(mutex); */
     for (std::size_t i = 0; i < nodes.size(); ++i) {
       auto &h = nodes[i];
       apply(h);
@@ -167,12 +172,14 @@ struct LabelThreadSafe : Label {
 
   template <typename FUNC>
   bool appliesToAny(FUNC &&toVerfiy) const {
-    std::lock_guard<std::mutex> lock(mutex);
+    std::lock_guard<Spinlock> lock(mutex);
+    /* std::lock_guard<std::mutex> lock(mutex); */
     return std::any_of(nodes.begin(), nodes.end(), toVerfiy);
   }
 
   bool prune(const std::vector<std::uint8_t> &lookup) {
-    std::lock_guard<std::mutex> lock(mutex);
+    std::lock_guard<Spinlock> lock(mutex);
+    /* std::lock_guard<std::mutex> lock(mutex); */
     for (std::size_t i = 0; i < nodes.size(); ++i) {
       if (i + 4 < nodes.size()) {
         PREFETCH(&lookup[nodes[i + 4]]);
@@ -187,7 +194,8 @@ struct LabelThreadSafe : Label {
   }
 
   void sort() {
-    std::lock_guard<std::mutex> lock(mutex);
+    std::lock_guard<Spinlock> lock(mutex);
+    /* std::lock_guard<std::mutex> lock(mutex); */
     std::sort(nodes.begin(), nodes.end());
   }
   // all other methods will likely not be called in parallel

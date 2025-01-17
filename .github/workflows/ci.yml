@@ -36,3 +36,5 @@ jobs:
         run: |
           cd build-debug
           ./unit_test
+          cd ../build-san
+          ./unit_test

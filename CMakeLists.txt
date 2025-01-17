@@ -45,6 +45,7 @@ add_executable(unit_test
     tests/graph_test.cpp 
     tests/utils_test.cpp 
     tests/priority_queue_test.cpp 
+    tests/forest_test.cpp 
 )
 target_include_directories(unit_test PUBLIC datastructures)
 

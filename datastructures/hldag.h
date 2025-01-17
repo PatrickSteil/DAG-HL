@@ -30,6 +30,7 @@
 #include <stdexcept>
 #include <vector>
 
+#include "forest.h"
 #include "graph.h"
 #include "hub_labels.h"
 #include "ips4o.hpp"

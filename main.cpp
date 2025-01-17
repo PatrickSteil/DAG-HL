@@ -54,8 +54,8 @@ int main(int argc, char *argv[]) {
   omp_set_num_threads(numThreads);
 
   Graph g;
-  g.readSnap(inputFileName);
-  /* g.readDimacs(inputFileName); */
+  /* g.readSnap(inputFileName); */
+  g.readDimacs(inputFileName);
 
   if (showStats) {
     std::cout << "Forward ";
