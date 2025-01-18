@@ -117,6 +117,7 @@ struct Graph {
 
     adjArray.resize(maxVertex + 2, 0);
 
+    /* std::sort(edges.begin(), edges.end(), */
     ips4o::parallel::sort(edges.begin(), edges.end(),
                           [](const auto &left, const auto &right) {
                             return std::tie(left.first, left.second) <
@@ -299,6 +300,7 @@ struct Graph {
 
     adjArray.resize(maxVertex + 2, 0);
 
+    /* std::sort(edges.begin(), edges.end(), */
     ips4o::parallel::sort(edges.begin(), edges.end(),
                           [](const auto &left, const auto &right) {
                             return std::tie(left.first, left.second) <

@@ -4,7 +4,8 @@
 
 TEST(EdgeTreeTest, BasicOperations) {
   std::vector<Index> topoRank = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
-  EdgeTree<std::vector<Index>> tree(10, topoRank);
+  EdgeTree<std::vector<Index>> tree(
+      10, std::make_shared<const std::vector<Index>>(topoRank));
   tree.setRoot(0);
   tree.addEdge(0, 1, FWD);
   tree.addEdge(0, 2, FWD);
@@ -22,7 +23,8 @@ TEST(EdgeTreeTest, BasicOperations) {
 
 TEST(EdgeTreeTest, ComputeDescendants) {
   std::vector<Index> topoRank = {0, 1, 2, 3, 4};
-  EdgeTree<std::vector<Index>> tree(5, topoRank);
+  EdgeTree<std::vector<Index>> tree(
+      5, std::make_shared<const std::vector<Index>>(topoRank));
   tree.setRoot(0);
   tree.addEdge(0, 1, FWD);
   tree.addEdge(0, 2, FWD);
@@ -37,7 +39,7 @@ TEST(EdgeTreeTest, ComputeDescendants) {
 
 TEST(ForestTest, TreeManagement) {
   std::vector<Index> topoRank = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
-  Forest forest(10, topoRank);
+  Forest forest(10, std::make_shared<const std::vector<Index>>(topoRank));
   EXPECT_EQ(forest.numVertices, 10);
 
   std::size_t tree1_index = forest.newTree();

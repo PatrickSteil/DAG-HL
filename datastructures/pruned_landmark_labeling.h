@@ -25,6 +25,7 @@
 #include <vector>
 
 #include "bfs.h"
+#include "forest.h"
 #include "graph.h"
 #include "hub_labels.h"
 #include "status_log.h"
@@ -150,6 +151,35 @@ struct PLL {
     unsetLookup(v);
 
     alreadyProcessed[v].store(true, std::memory_order_relaxed);
+  }
+
+  void growTree(const Vertex v, EdgeTree<std::vector<Index>> &tree) {
+    assert(v < labels[BWD].size());
+    assert(!alreadyProcessed[v].load());
+
+    tree.clear();
+    tree.setRoot(v);
+
+    setLookup(v);
+
+    auto runOneDirection = [&](const DIRECTION dir) -> void {
+      bfs[dir].run(v, bfs::noOp, [&](const Vertex u, const Vertex w) {
+        bool prune = alreadyProcessed[w].load(std::memory_order_relaxed) ||
+                     labels[!dir][w].prune(lookup[dir]);
+
+        if (!prune) {
+          tree.addEdge(u, w, dir);
+        }
+
+        return prune;
+      });
+    };
+
+    for (auto dir : {FWD, BWD}) {
+      runOneDirection(dir);
+    }
+
+    unsetLookup(v);
   }
 
   void setLookup(const Vertex v) {

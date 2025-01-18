@@ -148,12 +148,12 @@ class PriorityQueue {
     return result;
   }
 
-  const HeapElement &front() const {
+  const HeapElement& front() const {
     assert(!empty());
     return heap.front();
   }
 
-  void buildFrom(std::vector<uint32_t> &values) {
+  void buildFrom(std::vector<uint32_t>& values) {
     mapper.clear();
     heap.clear();
 
@@ -178,6 +178,164 @@ class PriorityQueue {
       buildHeapRecursive(getRightChild(i));
     }
 
+    siftDown(i);
+  }
+
+  void reset() {
+    std::fill(mapper.begin(), mapper.end(), noIndexInt);
+    heap.clear();
+    heap.reserve(capacity());
+  }
+};
+
+struct MaxHeapComparator {
+  bool operator()(uint32_t a, uint32_t b) const { return a < b; }
+};
+
+template <typename T = Vertex, typename Comparator = std::less<T>,
+          typename IndexInt = std::uint32_t>
+class PriorityQueueExternal {
+ private:
+  const IndexInt noIndexInt = static_cast<IndexInt>(-1);
+
+  std::vector<IndexInt> heap;
+  std::vector<IndexInt> mapper;
+  const std::vector<T>* values;
+  Comparator comp;
+
+ public:
+  explicit PriorityQueueExternal(size_t size = 0,
+                                 Comparator comp = Comparator())
+      : heap(), mapper(size, noIndexInt), values(nullptr), comp(comp) {}
+
+  void setValues(const std::vector<T>& external_values) {
+    values = &external_values;
+  }
+
+  size_t size() const { return heap.size(); }
+  bool empty() const { return heap.empty(); }
+  size_t capacity() const { return mapper.size(); }
+
+  bool isValid(IndexInt i) const { return i < mapper.size(); }
+
+  bool heapPropertyFulfilled() const {
+    assert(values);
+    for (IndexInt i = 0; i < size(); ++i) {
+      IndexInt left = getLeftChild(i);
+      IndexInt right = getRightChild(i);
+
+      if (left < size() && comp((*values)[heap[left]], (*values)[heap[i]])) {
+        return false;
+      }
+      if (right < size() && comp((*values)[heap[right]], (*values)[heap[i]])) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  T get(IndexInt i) const {
+    assert(isValid(i));
+    if (mapper[i] == noIndexInt) return T{};
+    return (*values)[heap[mapper[i]]];
+  }
+
+  IndexInt getLeftChild(IndexInt i) const { return (i * 2) + 1; }
+  IndexInt getRightChild(IndexInt i) const { return (i * 2) + 2; }
+  IndexInt getParentIndex(IndexInt i) const { return (i - 1) / 2; }
+
+  void swap(IndexInt i, IndexInt j) {
+    assert(isValid(i) && isValid(j));
+    mapper[heap[i]] = j;
+    mapper[heap[j]] = i;
+    std::swap(heap[i], heap[j]);
+  }
+
+  void siftDown(IndexInt i) {
+    assert(values);
+    assert(isValid(i));
+    while (true) {
+      auto left = getLeftChild(i);
+      auto right = getRightChild(i);
+      auto smallest = i;
+
+      if (left < size() &&
+          comp((*values)[heap[left]], (*values)[heap[smallest]])) {
+        smallest = left;
+      }
+      if (right < size() &&
+          comp((*values)[heap[right]], (*values)[heap[smallest]])) {
+        smallest = right;
+      }
+      if (smallest == i) return;
+
+      swap(i, smallest);
+      i = smallest;
+    }
+  }
+
+  void siftUp(IndexInt i) {
+    assert(values);
+    assert(isValid(i));
+    while (i > 0) {
+      IndexInt parent = getParentIndex(i);
+      if (comp((*values)[heap[i]], (*values)[heap[parent]])) {
+        swap(i, parent);
+        i = parent;
+      } else {
+        return;
+      }
+    }
+  }
+
+  void update(IndexInt i) {
+    assert(values);
+    assert(isValid(i));
+    assert(mapper[i] != noIndexInt);
+    IndexInt pos = mapper[i];
+    siftDown(pos);
+    siftUp(pos);
+  }
+
+  IndexInt pop() {
+    assert(values);
+    if (empty()) return noIndexInt;
+
+    IndexInt result = heap[0];
+    swap(0, size() - 1);
+    heap.pop_back();
+    mapper[result] = noIndexInt;
+
+    if (!empty()) siftDown(0);
+
+    return result;
+  }
+
+  IndexInt front() const {
+    assert(!empty());
+    return heap.front();
+  }
+
+  void buildFrom(std::vector<T>& external_values) {
+    setValues(external_values);
+    mapper.clear();
+    heap.clear();
+
+    if (values->empty()) return;
+
+    mapper.resize(values->size(), noIndexInt);
+    heap.resize(values->size());
+
+    for (IndexInt i = 0; i < values->size(); ++i) {
+      heap[i] = i;
+      mapper[i] = i;
+    }
+    buildHeapRecursive(0);
+  }
+
+  void buildHeapRecursive(IndexInt i) {
+    if (2 * i + 1 < size()) buildHeapRecursive(getLeftChild(i));
+    if (2 * i + 2 < size()) buildHeapRecursive(getRightChild(i));
     siftDown(i);
   }
 

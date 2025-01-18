@@ -8,6 +8,7 @@
 #include <omp.h>
 
 #include <algorithm>
+#include <atomic>
 #include <bit>
 #include <bitset>
 #include <concepts>
@@ -16,6 +17,7 @@
 #include <memory>
 #include <numeric>
 #include <random>
+#include <utility>
 #include <vector>
 
 template <std::size_t N>
@@ -134,4 +136,15 @@ std::vector<std::pair<VALUE, VALUE>> generateRandomQueries(int numQueries,
   }
 
   return queries;
+}
+
+template <typename T>
+bool fetch_max(std::atomic<T> &atomicValue, T newValue) {
+  T oldValue = atomicValue.load();
+  while (newValue > oldValue) {
+    if (atomicValue.compare_exchange_weak(oldValue, newValue)) {
+      return true;
+    }
+  }
+  return false;
 }

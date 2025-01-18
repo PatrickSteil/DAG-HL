@@ -9,6 +9,7 @@
 
 #include <array>
 #include <functional>
+#include <memory>
 #include <unordered_map>
 #include <vector>
 
@@ -50,14 +51,19 @@ class EdgeTree {
   STORAGE descendants;
 
   // Maps each vertex to its topological rank
-  std::reference_wrapper<const std::vector<Index>> topoRank;
+  std::shared_ptr<const std::vector<Index>> topoRank;
 
   // Root of the tree
   Vertex root;
 
   // Constructor - initializes storage if using a vector
-  explicit EdgeTree(std::size_t numVertices, const std::vector<Index>& topoRank)
-      : descendants(numVertices, 0), topoRank(topoRank) {}
+  explicit EdgeTree(std::size_t numVertices,
+                    std::shared_ptr<const std::vector<Index>> topoRankPar)
+      : descendants(numVertices, 0), topoRank(topoRankPar) {
+    assert(topoRank);
+    assert(!(*topoRank).empty());
+    assert((*topoRank).size() == numVertices);
+  }
 
   EdgeTree(EdgeTree&& other) = default;
   EdgeTree& operator=(EdgeTree&& other) = default;
@@ -103,8 +109,10 @@ class EdgeTree {
       assert(from < descendants.size());
       assert(to < descendants.size());
     }
-    assert(!(dir == FWD) || topoRank.get()[from] < topoRank.get()[to]);
-    assert(!(dir == BWD) || topoRank.get()[to] < topoRank.get()[from]);
+    assert(from < (*topoRank).size());
+    assert(to < (*topoRank).size());
+    assert(!(dir == FWD) || (*topoRank)[from] < (*topoRank)[to]);
+    assert(!(dir == BWD) || (*topoRank)[to] < (*topoRank)[from]);
     edges[dir].emplace_back(from, to);
   }
 
@@ -150,8 +158,7 @@ class EdgeTree {
     }
 
     // Process only the direction where the vertex could be
-    const DIRECTION dir =
-        (topoRank.get()[getRoot()] < topoRank.get()[v] ? FWD : BWD);
+    const DIRECTION dir = ((*topoRank)[getRoot()] < (*topoRank)[v] ? FWD : BWD);
 
     auto runForDir = [&](const DIRECTION dir) -> void {
       for (std::size_t i = 0; i < edges[dir].size(); ++i) {
@@ -225,18 +232,27 @@ struct Forest {
   std::vector<EdgeTree<std::vector<Index>>> trees;
 
   // Maps each vertex to its topological rank
-  std::reference_wrapper<const std::vector<Index>> topoRank;
+  std::shared_ptr<const std::vector<Index>> topoRank;
 
   std::size_t numVertices;
 
-  Forest(const std::size_t numVerticesNew, const std::vector<Index>& topoRank)
-      : trees(), topoRank(topoRank), numVertices(numVerticesNew) {
+  Forest(const std::size_t numVerticesNew,
+         std::shared_ptr<const std::vector<Index>> topoRankPar,
+         const int defaultTrees = 0)
+      : trees(), topoRank(topoRankPar), numVertices(numVerticesNew) {
+    assert(topoRank);
+    assert(!(*topoRank).empty());
+    assert((*topoRank).size() == numVertices);
     trees.reserve(32);
+
+    for (int i = 0; i < defaultTrees; ++i) {
+      newTree();
+    }
   };
 
   Forest(Forest&& other) noexcept
       : trees(std::move(other.trees)),
-        topoRank(other.topoRank),
+        topoRank(std::move(other.topoRank)),
         numVertices(other.numVertices) {}
 
   // Returns the index of the newTree.
@@ -272,7 +288,7 @@ struct Forest {
   // Parameter allows to specify the number of threads to use (trivial
   // parallelism: two trees are independent from each other)
   void computeSubtreeSizes(const int numThreads = 1) {
-#pragma omp parallel for schedule(dynamic) num_threads(numThreads)
+#pragma omp parallel for schedule(dynamic, 4) num_threads(numThreads)
     for (std::size_t t = 0; t < trees.size(); ++t) {
       auto& tree = trees[t];
       tree.clearDescendants();
@@ -320,3 +336,64 @@ struct Forest {
     }
   }
 };
+// Priority Functions
+// TODO check that no overflow or whatsoever happens
+
+// Take the sum, but subtract the 2 largest values from it, then take the
+// average.
+std::pair<std::uint32_t, std::uint32_t> getImportanceByAvg2Max(
+    const std::array<std::uint32_t, 16>& values) {
+  std::uint32_t sum = 0;
+  std::uint32_t max1 = 0;
+  std::uint32_t max2 = 0;
+
+// this is not SIMD'ed (as far as my compiler goes according to godbolt)...
+// nevertheless, it is fast enough
+#pragma GCC unroll(4)
+  for (std::size_t i = 0; i < 16; ++i) {
+    sum += values[i];
+
+    bool first = (values[i] > max1);
+    bool second = (values[i] > max2);
+
+    max2 = (first ? max1 : (second ? values[i] : max2));
+    max1 = (first ? values[i] : max1);
+  }
+
+  std::uint32_t avg = static_cast<std::uint32_t>((sum - max1 - max2) / 16);
+
+  return std::make_pair(avg, sum);
+}
+
+// Take the sum, but subtract the largest value from it.
+std::pair<std::uint32_t, std::uint32_t> getImportanceByAvg1Max(
+    const std::array<std::uint32_t, 16>& values) {
+  std::uint32_t sum = 0;
+  std::uint32_t max = 0;
+
+  // this is optimised anyway, this is a couple of horizontal sums and some
+  // bitmaks. every compiler does a better job applying SIMD than me.
+  for (std::size_t i = 0; i < 16; ++i) {
+    sum += values[i];
+
+    max = (values[i] > max ? values[i] : max);
+  }
+
+  std::uint32_t avg = static_cast<std::uint32_t>((sum - max) / 16);
+  return std::make_pair(avg, sum);
+}
+
+// Take the average, without any bias-handling.
+std::pair<std::uint32_t, std::uint32_t> getImportanceByAverage(
+    const std::array<std::uint32_t, 16>& values) {
+  std::uint32_t sum = 0;
+
+  // this is optimised anyway, this is a couple of horizontal sums...
+  // every compiler does a better job applying SIMD than me.
+  for (std::size_t i = 0; i < 16; ++i) {
+    sum += values[i];
+  }
+
+  std::uint32_t avg = static_cast<std::uint32_t>(sum / 16);
+  return std::make_pair(avg, sum);
+}

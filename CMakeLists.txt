@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-set(CMAKE_CXX_FLAGS "-pipe -march=native -Wfatal-errors -pthread")
+set(CMAKE_CXX_FLAGS "-pipe -march=native -Wfatal-errors -pthread -fopenmp")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++20")
 
 set(CMAKE_CXX_FLAGS_RELEASE "-ffast-math -DNDEBUG -O3 -g")
@@ -29,14 +29,10 @@ target_include_directories(${PROJECT_NAME} PUBLIC datastructures)
 add_subdirectory(external/ips4o EXCLUDE_FROM_ALL)
 target_link_libraries(${PROJECT_NAME} PRIVATE ips4o)
 
-find_package(OpenMP REQUIRED)
-if(OpenMP_CXX_FOUND)
-    target_compile_options(${PROJECT_NAME} PRIVATE ${OpenMP_CXX_FLAGS})
-    target_link_libraries(${PROJECT_NAME} PUBLIC OpenMP::OpenMP_CXX)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DUSE_OMP")
-else()
-    message(FATAL_ERROR "OpenMP requested but not found")
-endif()
+# Apply OpenMP flags
+# target_compile_options(${PROJECT_NAME} PRIVATE ${OpenMP_CXX_FLAGS})
+# target_link_libraries(${PROJECT_NAME} PUBLIC ${OpenMP_CXX_LIB_NAMES})
+
 
 enable_testing()
 
@@ -53,9 +49,9 @@ find_package(GTest REQUIRED)
 target_link_libraries(unit_test PRIVATE GTest::gtest_main)
 target_link_libraries(unit_test PRIVATE ips4o)
 
-if(OpenMP_CXX_FOUND)
-    target_link_libraries(unit_test PUBLIC OpenMP::OpenMP_CXX)
-endif()
+# For unit tests
+set(OpenMP_CXX_FLAGS "-fopenmp")
+target_compile_options(unit_test PRIVATE ${OpenMP_CXX_FLAGS})
 
 add_test(NAME unit_test COMMAND unit_test)
 

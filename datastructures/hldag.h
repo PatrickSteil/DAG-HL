@@ -30,6 +30,7 @@
 #include <stdexcept>
 #include <vector>
 
+#include "drawer.h"
 #include "forest.h"
 #include "graph.h"
 #include "hub_labels.h"
@@ -39,30 +40,42 @@
 #include "topological_sort.h"
 #include "utils.h"
 
-template <int WIDTH = 256, class LABEL = Label>
+template <int T = 32, int WIDTH = 256, class LABEL = Label>
 struct HLDAG {
  public:
   std::array<std::vector<LABEL>, 2> labels;
 
   std::vector<std::atomic<bool>> alreadyProcessed;
   std::array<const Graph *, 2> graph;
+  std::vector<std::size_t> rank;
 
   std::vector<Edge> edges;
 
   std::array<std::vector<std::bitset<WIDTH>>, 2> reachability;
 
   std::vector<PLL<WIDTH, LABEL>> plls;
+
+  Drawer drawer;
+  Forest forest;
+
+  std::vector<std::array<std::uint32_t, 16>> valuesPerElement;
   const int numThreads;
 
-  HLDAG(const Graph &fwdGraph, const Graph &bwdGraph, const int numThreads = 1)
+  HLDAG(const Graph &fwdGraph, const Graph &bwdGraph,
+        const std::vector<std::size_t> &rankPar, const int numThreads = 1)
       : labels{std::vector<LABEL>(), std::vector<LABEL>()},
         alreadyProcessed(),
         graph{&fwdGraph, &bwdGraph},
+        rank(rankPar),
         edges(),
         reachability{std::vector<std::bitset<WIDTH>>(),
                      std::vector<std::bitset<WIDTH>>()},
         plls(numThreads,
              PLL<WIDTH, LABEL>(labels, reachability, alreadyProcessed, graph)),
+        drawer(fwdGraph.numVertices()),
+        forest(fwdGraph.numVertices(),
+               std::make_shared<const std::vector<std::size_t>>(rank), T),
+        valuesPerElement(fwdGraph.numVertices()),
         numThreads(numThreads) {
     init(fwdGraph.numVertices());
   };
@@ -105,6 +118,70 @@ struct HLDAG {
         plls[0].runPrunedBFS(j, ordering);
       }
     }
+  }
+
+  // Sampling stuff
+  void sample() {
+    // - pick T vertices
+    // - grow the trees in parallel
+    // - compute descendants count
+    // - pick top K vertices one after the other
+    assert(drawer.hasNext());
+    assert(T <= drawer.size());
+
+    std::array<Vertex, T> pickedVertices;
+
+#pragma GCC unroll(4)
+    for (std::size_t i = 0; i < T; ++i) {
+      pickedVertices[i] = drawer.draw();
+    }
+
+#pragma omp parallel for num_threads(numThreads)
+    for (std::size_t i = 0; i < T; ++i) {
+      int threadId = omp_get_thread_num();
+
+      auto &tree = forest[i];
+      plls[threadId].growTree(pickedVertices[i], tree);
+    }
+
+    forest.computeSubtreeSizes(numThreads);
+  }
+
+  void updateDescendantCounter() {
+#pragma omp parallel for num_threads(numThreads)
+    for (std::size_t v = 0; v < graph[FWD]->numVertices(); ++v) {
+      std::fill(std::begin(valuesPerElement[v]), std::end(valuesPerElement[v]),
+                0);
+      for (std::size_t j = 0; j < forest.numberOfTrees(); ++j) {
+        valuesPerElement[v][j % 16] += forest[j].getOrDefault(v);
+      }
+    }
+  }
+
+  void growTree(const Vertex v, const std::size_t treeIndex,
+                const std::size_t threadId) {
+    auto &tree = forest[treeIndex];
+    plls[threadId].growTree(v, tree);
+  }
+
+  Vertex pickBestVertex() {
+    std::atomic<std::uint64_t> importance(0);
+    std::atomic<Vertex> result(noVertex);
+
+#pragma omp parallel for num_threads(numThreads)
+    for (std::size_t v = 0; v < graph[FWD]->numVertices(); ++v) {
+      auto currentImportance = getImportanceByAvg2Max(valuesPerElement[v]);
+
+      std::uint64_t thisImportance =
+          (static_cast<std::uint64_t>(currentImportance.first) << 32) |
+          (currentImportance.second);
+
+      if (fetch_max(importance, thisImportance)) {
+        result.store(v);
+      }
+    }
+
+    return result.load();
   }
 
   void runSweep(const std::size_t left, const std::vector<Vertex> &ordering) {
@@ -235,6 +312,7 @@ struct HLDAG {
 
       parallel_iota(ordering, Vertex(0));
       ips4o::parallel::sort(ordering.begin(), ordering.end(), degreeCompRandom);
+      /* std::sort(ordering.begin(), ordering.end(), degreeCompRandom); */
       assert(
           std::is_sorted(ordering.begin(), ordering.end(), degreeCompRandom));
     } else {
@@ -290,15 +368,6 @@ struct HLDAG {
 
     alreadyProcessed = std::vector<std::atomic<bool>>(numVertices);
 
-    TopologicalSort sorter(*graph[FWD]);
-    std::vector<std::size_t> rank;
-    parallel_assign(rank, numVertices, std::size_t(0));
-
-#pragma omp parallel for
-    for (std::size_t i = 0; i < numVertices; ++i) {
-      rank[sorter.getOrdering()[i]] = i;
-    }
-
     edges.reserve(graph[FWD]->numEdges());
 
     for (Vertex from = 0; from < numVertices; ++from) {
@@ -308,6 +377,7 @@ struct HLDAG {
       }
     }
 
+    /* std::sort(edges.begin(), edges.end(), */
     ips4o::parallel::sort(edges.begin(), edges.end(),
                           [&](const auto &left, const auto &right) {
                             return std::tie(rank[left.from], rank[left.to]) <
