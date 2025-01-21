@@ -123,8 +123,7 @@ struct PLL {
     alreadyProcessed[v].store(true, std::memory_order_relaxed);
   }
 
-  void runPrunedBFS(const std::size_t i, const std::vector<Vertex> &ordering) {
-    const Vertex v = ordering[i];
+  void runPrunedBFS(const Vertex v) {
     assert(v < labels[BWD].size());
 
     setLookup(v);
@@ -157,8 +156,7 @@ struct PLL {
     assert(v < labels[BWD].size());
     assert(!alreadyProcessed[v].load());
 
-    tree.clear();
-    tree.setRoot(v);
+    tree.reset(v);
 
     setLookup(v);
 

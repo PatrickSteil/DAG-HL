@@ -319,6 +319,16 @@ struct Forest {
   // on.
   void clear() { trees.clear(); }
 
+  // Returns the total number of edges touched by trees.
+  std::size_t numEdges() {
+    std::size_t result = 0;
+
+    for (const auto& tree : trees) {
+      result += tree.numEdges();
+    }
+    return result;
+  }
+
   // Resets everything, i.e., no more trees and no information about the number
   // of vertices in the 'overlaying' graph.
   void reset(std::size_t numVerticesNew) {
@@ -343,7 +353,7 @@ struct Forest {
 // average.
 std::pair<std::uint32_t, std::uint32_t> getImportanceByAvg2Max(
     const std::array<std::uint32_t, 16>& values) {
-  std::uint32_t sum = 0;
+  std::uint32_t sum = 1;
   std::uint32_t max1 = 0;
   std::uint32_t max2 = 0;
 
@@ -368,7 +378,7 @@ std::pair<std::uint32_t, std::uint32_t> getImportanceByAvg2Max(
 // Take the sum, but subtract the largest value from it.
 std::pair<std::uint32_t, std::uint32_t> getImportanceByAvg1Max(
     const std::array<std::uint32_t, 16>& values) {
-  std::uint32_t sum = 0;
+  std::uint32_t sum = 1;
   std::uint32_t max = 0;
 
   // this is optimised anyway, this is a couple of horizontal sums and some
@@ -386,7 +396,7 @@ std::pair<std::uint32_t, std::uint32_t> getImportanceByAvg1Max(
 // Take the average, without any bias-handling.
 std::pair<std::uint32_t, std::uint32_t> getImportanceByAverage(
     const std::array<std::uint32_t, 16>& values) {
-  std::uint32_t sum = 0;
+  std::uint32_t sum = 1;
 
   // this is optimised anyway, this is a couple of horizontal sums...
   // every compiler does a better job applying SIMD than me.

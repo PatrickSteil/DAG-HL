@@ -1,3 +1,6 @@
 [submodule "external/ips4o"]
 	path = external/ips4o
 	url = https://github.com/ips4o/ips4o.git
+[submodule "external/emhash"]
+	path = external/emhash
+	url = https://github.com/PatrickSteil/emhash.git

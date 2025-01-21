@@ -53,7 +53,7 @@ int main(int argc, char *argv[]) {
   const auto run_benchmark = parser.get<bool>("b");
 
   // Min Trees
-  const int T = 32;
+  const int T = 8;
   // Bitset Width
   const int K = 256;
 
@@ -112,7 +112,7 @@ int main(int argc, char *argv[]) {
   /* } */
   /* return 0; */
 
-  hl.template run<true>(orderingFile);
+  hl.run(orderingFile);
 
   if (compress) {
     auto permutation = computePermutation(hl.labels);

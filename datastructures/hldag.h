@@ -115,9 +115,36 @@ struct HLDAG {
       }
     } else {
       for (std::size_t j = i; j < numVertices; ++j) {
-        plls[0].runPrunedBFS(j, ordering);
+        plls[0].runPrunedBFS(ordering[j]);
       }
     }
+  }
+
+  void updateTrees() {
+    assert(drawer.hasNext());
+
+    std::array<Vertex, T> pickedVertices;
+
+    std::size_t limit = std::min(static_cast<std::size_t>(T), drawer.size());
+
+    for (std::size_t i = 0; i < limit; ++i) {
+      pickedVertices[i] = drawer.draw();
+    }
+
+    for (std::size_t i = 0; i < T; ++i) {
+      auto &tree = forest[i];
+      tree.clear();
+
+      if (i < limit) {
+        plls[0].growTree(pickedVertices[i], tree);
+        // add vertex back to drawer
+        drawer.add(pickedVertices[i]);
+      }
+    }
+
+    forest.computeSubtreeSizes();
+
+    updateDescendantCounter();
   }
 
   // Sampling stuff
@@ -142,8 +169,9 @@ struct HLDAG {
 
       auto &tree = forest[i];
       plls[threadId].growTree(pickedVertices[i], tree);
-    }
 
+      drawer.add(pickedVertices[i]);
+    }
     forest.computeSubtreeSizes(numThreads);
   }
 
@@ -170,7 +198,9 @@ struct HLDAG {
 
 #pragma omp parallel for num_threads(numThreads)
     for (std::size_t v = 0; v < graph[FWD]->numVertices(); ++v) {
-      auto currentImportance = getImportanceByAvg2Max(valuesPerElement[v]);
+      if (alreadyProcessed[v].load()) continue;
+
+      auto currentImportance = getImportanceByAverage(valuesPerElement[v]);
 
       std::uint64_t thisImportance =
           (static_cast<std::uint64_t>(currentImportance.first) << 32) |
@@ -181,6 +211,12 @@ struct HLDAG {
       }
     }
 
+    Vertex v = result.load();
+    assert(v != noVertex);
+    drawer.remove(v);
+
+    std::cout << "Vertex " << result.load() << " [" << importance.load() << "]"
+              << std::endl;
     return result.load();
   }
 

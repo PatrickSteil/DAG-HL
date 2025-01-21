@@ -6,34 +6,32 @@
 #pragma once
 
 #include <algorithm>
+#include <cstddef>
+#include <cstdint>
 #include <iostream>
 #include <random>
 #include <vector>
 
-/*
- * Simple class to pick random numbers one by one
- */
+#include "../external/emhash/hash_table5.hpp"
+
 class Drawer {
  public:
-  // Constructor initializes the drawer with n elements and a random number
-  // generator
-  explicit Drawer(std::size_t n, const int seed = 42) : n(n), rng(seed) {
-    reset();
-  }
+  explicit Drawer(std::size_t n, int seed = 42) : n(n), rng(seed) { reset(); }
 
-  // Resets the drawer, filling it with numbers from 0 to n-1
   void reset() {
     numbers.resize(n);
-    std::iota(numbers.begin(), numbers.end(), 0);
+    index_map.clear();
+    index_map.reserve(n);
+    for (std::size_t i = 0; i < n; ++i) {
+      numbers[i] = i;
+      index_map.emplace_unique(i, i);
+    }
   }
 
-  // Returns the current number of elements in the drawer
   std::size_t size() const { return numbers.size(); }
 
-  // Checks if there are numbers left to draw
   bool hasNext() const { return !numbers.empty(); }
 
-  // Draws a random number from the drawer and removes it
   std::size_t draw() {
     if (numbers.empty()) {
       return static_cast<std::size_t>(-1);
@@ -43,18 +41,36 @@ class Drawer {
         std::uniform_int_distribution<std::size_t>(0, numbers.size() - 1)(rng);
     std::size_t drawn_number = numbers[index];
 
-    // Swap with last element and remove last element to maintain O(1) removal
-    std::swap(numbers[index], numbers.back());
-    numbers.pop_back();
+    assert(index_map.contains(drawn_number));
 
+    remove(drawn_number);
     return drawn_number;
   }
 
-  // Adds a number back to the drawer even if it's already present
-  void add(std::size_t number) { numbers.push_back(number); }
+  void add(std::size_t number) {
+    if (index_map.contains(number)) return;
+    index_map.insert_unique(number, numbers.size());
+    numbers.push_back(number);
+  }
+
+  bool remove(std::size_t number) {
+    if (!index_map.contains(number)) return false;
+
+    std::size_t index = index_map[number];
+    std::size_t last_number = numbers.back();
+
+    std::swap(numbers[index], numbers.back());
+    numbers.pop_back();
+
+    index_map[last_number] = index;
+    index_map.erase(number);
+
+    return true;
+  }
 
  private:
   std::size_t n;
-  std::vector<std::size_t> numbers;
+  std::vector<std::uint32_t> numbers;
+  emhash5::HashMap<std::uint32_t, std::uint32_t> index_map;
   std::mt19937 rng;
 };

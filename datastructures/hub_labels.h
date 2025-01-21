@@ -19,10 +19,10 @@
 #include <fstream>
 #include <iostream>
 #include <numeric>
+#include <queue>
 #include <sstream>
 #include <vector>
 
-#include "priority_queue.h"
 #include "spinlock.h"
 #include "status_log.h"
 #include "types.h"
@@ -373,14 +373,24 @@ std::vector<Vertex> computePermutation(
     }
   }
 
-  PriorityQueue<std::greater<std::uint32_t>> q;
-  q.buildFrom(freq);
+  using Pair = std::pair<std::uint32_t, Vertex>;
+  std::vector<Pair> heap_data;
+  heap_data.reserve(numVertices);
+
+  for (Vertex v = 0; v < numVertices; ++v) {
+    heap_data.emplace_back(freq[v], v);
+  }
+
+  auto cmp = [](const Pair &a, const Pair &b) { return a.first > b.first; };
+  std::make_heap(heap_data.begin(), heap_data.end(), cmp);
 
   Vertex id(0);
-  while (!q.empty()) {
-    auto [occur, hub] = q.pop();
-    assert(hub != noVertex);
+  while (!heap_data.empty()) {
+    std::pop_heap(heap_data.begin(), heap_data.end(), cmp);
+    auto [occur, hub] = heap_data.back();
+    heap_data.pop_back();
 
+    assert(hub != noVertex);
     result[hub] = id;
     ++id;
   }
