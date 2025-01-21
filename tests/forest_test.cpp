@@ -3,38 +3,71 @@
 #include <gtest/gtest.h>
 
 TEST(EdgeTreeTest, BasicOperations) {
-  std::vector<Index> topoRank = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
-  EdgeTree<std::vector<Index>> tree(
-      10, std::make_shared<const std::vector<Index>>(topoRank));
-  tree.setRoot(0);
-  tree.addEdge(0, 1, FWD);
-  tree.addEdge(0, 2, FWD);
-  tree.addEdge(1, 3, FWD);
-  tree.addEdge(1, 4, FWD);
+  {
+    std::vector<Index> topoRank = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+    EdgeTreeVec tree(10, std::make_shared<const std::vector<Index>>(topoRank));
+    tree.setRoot(0);
+    tree.addEdge(0, 1, FWD);
+    tree.addEdge(0, 2, FWD);
+    tree.addEdge(1, 3, FWD);
+    tree.addEdge(1, 4, FWD);
 
-  tree.computeDescendants();
+    tree.computeDescendants();
 
-  EXPECT_EQ(tree.getRoot(), 0);
-  EXPECT_EQ(tree.numEdges(), 4);
+    EXPECT_EQ(tree.getRoot(), 0);
+    EXPECT_EQ(tree.numEdges(), 4);
 
-  tree.removeSubtree(1);
-  EXPECT_EQ(tree.numEdges(), 1);
+    tree.removeSubtree(1);
+    EXPECT_EQ(tree.numEdges(), 1);
+  }
+  {
+    std::vector<Index> topoRank = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+    EdgeTreeMap tree(10, std::make_shared<const std::vector<Index>>(topoRank));
+    tree.setRoot(0);
+    tree.addEdge(0, 1, FWD);
+    tree.addEdge(0, 2, FWD);
+    tree.addEdge(1, 3, FWD);
+    tree.addEdge(1, 4, FWD);
+
+    tree.computeDescendants();
+
+    EXPECT_EQ(tree.getRoot(), 0);
+    EXPECT_EQ(tree.numEdges(), 4);
+
+    tree.removeSubtree(1);
+    EXPECT_EQ(tree.numEdges(), 1);
+  }
 }
 
 TEST(EdgeTreeTest, ComputeDescendants) {
-  std::vector<Index> topoRank = {0, 1, 2, 3, 4};
-  EdgeTree<std::vector<Index>> tree(
-      5, std::make_shared<const std::vector<Index>>(topoRank));
-  tree.setRoot(0);
-  tree.addEdge(0, 1, FWD);
-  tree.addEdge(0, 2, FWD);
-  tree.addEdge(1, 3, FWD);
-  tree.addEdge(1, 4, FWD);
+  {
+    std::vector<Index> topoRank = {0, 1, 2, 3, 4};
+    EdgeTreeVec tree(5, std::make_shared<const std::vector<Index>>(topoRank));
+    tree.setRoot(0);
+    tree.addEdge(0, 1, FWD);
+    tree.addEdge(0, 2, FWD);
+    tree.addEdge(1, 3, FWD);
+    tree.addEdge(1, 4, FWD);
 
-  tree.computeDescendants();
+    tree.computeDescendants();
 
-  EXPECT_GT(tree.getOrDefault(0), tree.getOrDefault(1));
-  EXPECT_GT(tree.getOrDefault(1), tree.getOrDefault(3));
+    EXPECT_GT(tree.descendants[0], tree.descendants[1]);
+    EXPECT_GT(tree.descendants[1], tree.descendants[3]);
+  }
+  {
+    std::vector<Index> topoRank = {0, 1, 2, 3, 4};
+    EdgeTreeMap tree(5, std::make_shared<const std::vector<Index>>(topoRank));
+    tree.setRoot(0);
+    tree.addEdge(0, 1, FWD);
+    tree.addEdge(0, 2, FWD);
+    tree.addEdge(1, 3, FWD);
+    tree.addEdge(1, 4, FWD);
+
+    tree.computeDescendants();
+
+    EXPECT_GT(tree.descendants[0], tree.descendants[1]);
+    EXPECT_GT(tree.descendants[1], tree.descendants[3]);
+  }
 }
 
 TEST(ForestTest, TreeManagement) {
@@ -61,12 +94,12 @@ TEST(ForestTest, TreeManagement) {
   tree2.addEdge(5, 6, FWD);
 
   forest.computeSubtreeSizes();
-  EXPECT_EQ(tree1.getOrDefault(0), 2);
-  EXPECT_EQ(tree2.getOrDefault(5), 1);
+  EXPECT_EQ(tree1.descendants[0], 2);
+  EXPECT_EQ(tree2.descendants[5], 1);
 
   forest.removeSubtreesAtVertex(0);
-  EXPECT_EQ(tree1.getOrDefault(0), 0);
-  EXPECT_EQ(tree2.getOrDefault(5), 1);
+  EXPECT_EQ(tree1.descendants[0], 0);
+  EXPECT_EQ(tree2.descendants[5], 1);
 
   forest.removeTreesWithNoEdges();
   EXPECT_EQ(forest.numberOfTrees(), 1);
@@ -84,10 +117,10 @@ TEST(ForestTest, TreeManagement) {
   tree3.addEdge(2, 1, BWD);
 
   forest.computeSubtreeSizes();
-  EXPECT_EQ(tree2_new.getOrDefault(5), 1);
-  EXPECT_EQ(tree3.getOrDefault(2), 4);
-  EXPECT_EQ(tree3.getOrDefault(3), 0);
-  EXPECT_EQ(tree3.getOrDefault(4), 0);
-  EXPECT_EQ(tree3.getOrDefault(5), 1);
-  EXPECT_EQ(tree3.getOrDefault(6), 0);
+  EXPECT_EQ(tree2_new.descendants[5], 1);
+  EXPECT_EQ(tree3.descendants[2], 4);
+  EXPECT_EQ(tree3.descendants[3], 0);
+  EXPECT_EQ(tree3.descendants[4], 0);
+  EXPECT_EQ(tree3.descendants[5], 1);
+  EXPECT_EQ(tree3.descendants[6], 0);
 }

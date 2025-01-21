@@ -10,28 +10,28 @@
 #include <array>
 #include <functional>
 #include <memory>
-#include <unordered_map>
 #include <vector>
 
+#include "../external/emhash/hash_table5.hpp"
 #include "graph.h"
 #include "types.h"
 #include "utils.h"
 
 /*
- * Supports both `std::vector` (for dense graphs) and `std::unordered_map` (for
- * sparse graphs) to store descendant counts. Provides efficient operations for
- * adding/removing edges, computing descendants, and iterating over vertices.
- * Note that this datastructure was implemented to work efficiently with DAGs,
- * "Undefined behaviour" if the underlying graph (from which we sample the FWD
- * and BWD tree) is not a DAG.
- * The main idea is not to store a parent array, as operations to compute the
- * subtree size and removing subtrees are rather 'unhandy' when using with
- * parent pointers. Also, due to memory consumption, we don't want to store a
- * vector<vector<Vertex>>. Instead, we store the edge list (which by
- * construction of the DAG which we sample from) respects the topological
- * ordering. Hence we can use dynamic programs to compute subtree sizes, as well
- * as removing subtrees whilst updating the descendants count. The runtime for
- * such a sweeo is O(|E(T)|), where E(T) are the edges we store.
+ * Supports both `std::vector` (for dense graphs) and `std::unordered_map` /
+ * 'emhash ' (for sparse graphs) to store descendant counts. Provides efficient
+ * operations for adding/removing edges, computing descendants, and iterating
+ * over vertices. Note that this datastructure was implemented to work
+ * efficiently with DAGs, "Undefined behaviour" if the underlying graph (from
+ * which we sample the FWD and BWD tree) is not a DAG. The main idea is not to
+ * store a parent array, as operations to compute the subtree size and removing
+ * subtrees are rather 'unhandy' when using with parent pointers. Also, due to
+ * memory consumption, we don't want to store a vector<vector<Vertex>>. Instead,
+ * we store the edge list (which by construction of the DAG which we sample
+ * from) respects the topological ordering. Hence we can use dynamic programs to
+ * compute subtree sizes, as well as removing subtrees whilst updating the
+ * descendants count. The runtime for such a sweeo is O(|E(T)|), where E(T) are
+ * the edges we store.
  */
 template <typename STORAGE>
 class EdgeTree {
@@ -40,7 +40,7 @@ class EdgeTree {
   static constexpr bool isVectorStorage =
       std::is_same_v<STORAGE, std::vector<Index>>;
   static constexpr bool isMapStorage =
-      std::is_same_v<STORAGE, std::unordered_map<Vertex, Index>>;
+      std::is_same_v<STORAGE, emhash5::HashMap<Vertex, Index>>;
 
   static_assert(isVectorStorage || isMapStorage);
 
@@ -59,7 +59,13 @@ class EdgeTree {
   // Constructor - initializes storage if using a vector
   explicit EdgeTree(std::size_t numVertices,
                     std::shared_ptr<const std::vector<Index>> topoRankPar)
-      : descendants(numVertices, 0), topoRank(topoRankPar) {
+      : descendants(), topoRank(topoRankPar) {
+    if constexpr (isVectorStorage && !isMapStorage) {
+      descendants.assign(numVertices, 0);
+    }
+    if constexpr (!isVectorStorage && isMapStorage) {
+      descendants.reserve(numVertices);
+    }
     assert(topoRank);
     assert(!(*topoRank).empty());
     assert((*topoRank).size() == numVertices);
@@ -91,7 +97,7 @@ class EdgeTree {
   void clear() {
     edges[FWD].clear();
     edges[BWD].clear();
-    std::fill(descendants.begin(), descendants.end(), 0);
+    clearDescendants();
   }
 
   // Resets the tree, setting a new root
@@ -127,7 +133,8 @@ class EdgeTree {
     auto runForDir = [&](const DIRECTION dir) -> void {
       for (std::size_t i = edges[dir].size(); i-- > 0;) {
         const auto& edge = edges[dir][i];
-        getOrDefault(edge.from) += 1 + getOrDefault(edge.to);
+        descendants[edge.from] =
+            descendants[edge.from] + 1 + descendants[edge.to];
       }
     };
     runForDir(FWD);
@@ -153,7 +160,7 @@ class EdgeTree {
     }
 
     // if the vertex is not in the tree / or a leaf, no nothing
-    if (getOrDefault(v) == 0) {
+    if (descendants[v] == 0) {
       return;
     }
 
@@ -165,18 +172,19 @@ class EdgeTree {
         auto& edge = edges[dir][i];
 
         bool isMatch = (edge.to == v);
-        bool remove = (isMatch || getOrDefault(edge.from) == noIndex);
+        bool remove = (isMatch || descendants[edge.from] == noIndex);
 
-        getOrDefault(edge.from) -= isMatch * (1 + getOrDefault(edge.to));
-        getOrDefault(edge.to) = (remove ? noIndex : getOrDefault(edge.to));
+        descendants[edge.from] =
+            descendants[edge.from] - isMatch * (1 + descendants[edge.to]);
+        descendants[edge.to] = (remove ? noIndex : descendants[edge.to]);
       }
 
       // Remove edges marked for deletion
       edges[dir].erase(std::remove_if(edges[dir].begin(), edges[dir].end(),
                                       [&](const auto& edge) {
-                                        return getOrDefault(edge.from) ==
+                                        return descendants[edge.from] ==
                                                    noIndex ||
-                                               getOrDefault(edge.to) == noIndex;
+                                               descendants[edge.to] == noIndex;
                                       }),
                        edges[dir].end());
     };
@@ -191,9 +199,11 @@ class EdgeTree {
         val = (val == noIndex) ? 0 : val;
       }
     } else {
-      std::erase_if(descendants, [](const auto& item) {
-        return item.second == noIndex || item.second == 0;
-      });
+      for (auto& item : descendants) {
+        if (item.second == noIndex || item.second == 0) {
+          descendants.remove(item.first);
+        }
+      }
     }
   }
 
@@ -206,22 +216,15 @@ class EdgeTree {
         func(v, descendants[v]);
       }
     } else {
-      for (const auto& [v, count] : descendants) {
-        func(v, count);
+      for (auto& item : descendants) {
+        func(item.first, item.second);
       }
     }
   }
-
-  // Retrieves the descendant count for a vertex, or returns a default value
-  Index& getOrDefault(Vertex vertex) {
-    if constexpr (isVectorStorage) {
-      assert(vertex < descendants.size());
-      return descendants[vertex];
-    } else {
-      return descendants[vertex];
-    }
-  }
 };
+
+using EdgeTreeVec = EdgeTree<std::vector<Index>>;
+using EdgeTreeMap = EdgeTree<std::vector<Index>>;
 
 /**
  * The forest maintains multiple trees, supporting operations for adding new
@@ -229,7 +232,7 @@ class EdgeTree {
  * It provides parallelized methods for efficient batch operations on all trees.
  */
 struct Forest {
-  std::vector<EdgeTree<std::vector<Index>>> trees;
+  std::vector<EdgeTreeVec> trees;
 
   // Maps each vertex to its topological rank
   std::shared_ptr<const std::vector<Index>> topoRank;
@@ -263,20 +266,19 @@ struct Forest {
   }
 
   // Access the i'th tree.
-  EdgeTree<std::vector<Index>>& operator[](const std::size_t i) noexcept {
+  EdgeTreeVec& operator[](const std::size_t i) noexcept {
     assert(i < trees.size());
     return trees[i];
   }
 
   // Access the i'th tree.
-  const EdgeTree<std::vector<Index>>& operator[](
-      const std::size_t i) const noexcept {
+  const EdgeTreeVec& operator[](const std::size_t i) const noexcept {
     assert(i < trees.size());
     return trees[i];
   }
 
   // Access the i'th tree.
-  EdgeTree<std::vector<Index>>& getTree(const std::size_t i) noexcept {
+  EdgeTreeVec& getTree(const std::size_t i) noexcept {
     assert(i < trees.size());
     return trees[i];
   }

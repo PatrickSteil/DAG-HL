@@ -181,7 +181,7 @@ struct HLDAG {
       std::fill(std::begin(valuesPerElement[v]), std::end(valuesPerElement[v]),
                 0);
       for (std::size_t j = 0; j < forest.numberOfTrees(); ++j) {
-        valuesPerElement[v][j % 16] += forest[j].getOrDefault(v);
+        valuesPerElement[v][j % 16] += forest[j].descendants[v];
       }
     }
   }
