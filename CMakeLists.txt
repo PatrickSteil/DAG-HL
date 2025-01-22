@@ -29,11 +29,6 @@ target_include_directories(${PROJECT_NAME} PUBLIC datastructures)
 add_subdirectory(external/ips4o EXCLUDE_FROM_ALL)
 target_link_libraries(${PROJECT_NAME} PRIVATE ips4o)
 
-# Apply OpenMP flags
-# target_compile_options(${PROJECT_NAME} PRIVATE ${OpenMP_CXX_FLAGS})
-# target_link_libraries(${PROJECT_NAME} PUBLIC ${OpenMP_CXX_LIB_NAMES})
-
-
 enable_testing()
 
 add_executable(unit_test 
@@ -50,23 +45,29 @@ find_package(GTest REQUIRED)
 target_link_libraries(unit_test PRIVATE GTest::gtest_main)
 target_link_libraries(unit_test PRIVATE ips4o)
 
-# For unit tests
-set(OpenMP_CXX_FLAGS "-fopenmp")
-target_compile_options(unit_test PRIVATE ${OpenMP_CXX_FLAGS})
-
+target_compile_options(unit_test PRIVATE -fopenmp)
 add_test(NAME unit_test COMMAND unit_test)
 
-# add_executable(benchmark_queue benchmark/queue_bench.cpp)
-# target_include_directories(benchmark_queue PUBLIC datastructures benchmark)
+add_executable(benchmark_queue benchmark/queue_bench.cpp)
+target_include_directories(benchmark_queue PUBLIC datastructures benchmark)
 
-# find_package(benchmark REQUIRED)
-# if(benchmark_FOUND)
-#     target_link_libraries(benchmark_queue PRIVATE benchmark::benchmark benchmark::benchmark_main)
-# else()
-#     message(FATAL_ERROR "Google Benchmark requested but not found")
-# endif()
+find_package(benchmark REQUIRED)
+if(benchmark_FOUND)
+    target_link_libraries(benchmark_queue PRIVATE benchmark::benchmark benchmark::benchmark_main)
+    target_link_libraries(benchmark_queue PRIVATE ips4o)
+    if(OpenMP_CXX_FOUND)
+        target_link_libraries(benchmark_queue PUBLIC OpenMP::OpenMP_CXX)
+    endif()
 
-# target_link_libraries(benchmark_queue PRIVATE ips4o)
-# if(OpenMP_CXX_FOUND)
-#     target_link_libraries(benchmark_queue PUBLIC OpenMP::OpenMP_CXX)
-# endif()
+    # EdgeTree Benchmark
+    add_executable(edgetree_bench benchmark/edgetree_bench.cpp)
+    target_include_directories(edgetree_bench PUBLIC datastructures benchmark)
+    target_link_libraries(edgetree_bench PRIVATE benchmark::benchmark benchmark::benchmark_main)
+    target_link_libraries(edgetree_bench PRIVATE ips4o)
+    if(OpenMP_CXX_FOUND)
+        target_link_libraries(edgetree_bench PUBLIC OpenMP::OpenMP_CXX)
+    endif()
+else()
+    message(FATAL_ERROR "Google Benchmark requested but not found")
+endif()
+

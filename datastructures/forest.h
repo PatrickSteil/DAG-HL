@@ -42,7 +42,8 @@ class EdgeTree {
   static constexpr bool isMapStorage =
       std::is_same_v<STORAGE, emhash5::HashMap<Vertex, Index>>;
 
-  static_assert(isVectorStorage || isMapStorage);
+  static_assert(isVectorStorage || isMapStorage,
+                "Either Vector or HashMap based!");
 
   // Edge storage for both directions (FWD and BWD)
   std::array<std::vector<Edge>, 2> edges;
@@ -171,6 +172,8 @@ class EdgeTree {
       return;
     }
 
+    assert(getRoot() < (*topoRank).size());
+    assert(v < (*topoRank).size());
     // Process only the direction where the vertex could be
     const DIRECTION dir = ((*topoRank)[getRoot()] < (*topoRank)[v] ? FWD : BWD);
 
@@ -233,7 +236,6 @@ class EdgeTree {
 using EdgeTreeVec = EdgeTree<std::vector<Index>>;
 using EdgeTreeMap = EdgeTree<emhash5::HashMap<Vertex, Index>>;
 
-// Define AllowedTree before Forest
 template <typename T>
 struct AllowedTree;
 
