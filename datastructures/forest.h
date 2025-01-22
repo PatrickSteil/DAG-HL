@@ -12,6 +12,7 @@
 #include <memory>
 #include <vector>
 
+#include "../external/emhash/hash_set2.hpp"
 #include "../external/emhash/hash_table5.hpp"
 #include "graph.h"
 #include "types.h"
@@ -65,7 +66,7 @@ class EdgeTree {
       descendants.assign(numVertices, 0);
     }
     if constexpr (!isVectorStorage && isMapStorage) {
-      descendants.reserve(numVertices);
+      descendants.reserve(numVertices >> 8);
     }
     assert(topoRank);
     assert(!(*topoRank).empty());
@@ -174,45 +175,48 @@ class EdgeTree {
 
     assert(getRoot() < (*topoRank).size());
     assert(v < (*topoRank).size());
+
     // Process only the direction where the vertex could be
     const DIRECTION dir = ((*topoRank)[getRoot()] < (*topoRank)[v] ? FWD : BWD);
 
-    auto runForDir = [&](const DIRECTION dir) -> void {
-      for (std::size_t i = 0; i < edges[dir].size(); ++i) {
-        auto& edge = edges[dir][i];
+    // creating a set helps reduce the O(n) overhead afterwards to "reset" the
+    // descendants
+    emhash2::HashSet<Vertex> verticesToRemove;
+    verticesToRemove.reserve(edges[dir].size() >> 4);
 
-        bool isMatch = (edge.to == v);
-        bool remove = (isMatch || descendants[edge.from] == noIndex);
+    for (std::size_t i = 0; i < edges[dir].size(); ++i) {
+      auto& edge = edges[dir][i];
 
-        descendants[edge.from] =
-            descendants[edge.from] - isMatch * (1 + descendants[edge.to]);
-        descendants[edge.to] = (remove ? noIndex : descendants[edge.to]);
+      bool isMatch = (edge.to == v);
+      bool remove = (isMatch || descendants[edge.from] == noIndex);
+
+      descendants[edge.from] =
+          descendants[edge.from] - isMatch * (1 + descendants[edge.to]);
+      descendants[edge.to] = (remove ? noIndex : descendants[edge.to]);
+
+      if (descendants[edge.from] == noIndex || descendants[edge.from] == 0) {
+        verticesToRemove.insert(edge.from);
       }
+      if (descendants[edge.to] == noIndex || descendants[edge.to] == 0) {
+        verticesToRemove.insert(edge.to);
+      }
+    }
 
-      // Remove edges marked for deletion
-      edges[dir].erase(std::remove_if(edges[dir].begin(), edges[dir].end(),
-                                      [&](const auto& edge) {
-                                        return descendants[edge.from] ==
-                                                   noIndex ||
-                                               descendants[edge.to] == noIndex;
-                                      }),
-                       edges[dir].end());
-    };
-
-    runForDir(dir);
-
-    // TODO: this could probably be done more efficiently, maybe do not reset
-    // here, but rather when we access the value?
+    // Remove edges marked for deletion
+    edges[dir].erase(std::remove_if(edges[dir].begin(), edges[dir].end(),
+                                    [&](const auto& edge) {
+                                      return descendants[edge.from] ==
+                                                 noIndex ||
+                                             descendants[edge.to] == noIndex;
+                                    }),
+                     edges[dir].end());
     if constexpr (isVectorStorage) {
-      for (std::size_t i = 0; i < descendants.size(); ++i) {
-        auto& val = descendants[i];
-        val = (val == noIndex) ? 0 : val;
+      for (auto v : verticesToRemove) {
+        descendants[v] = 0;
       }
     } else {
-      for (auto& item : descendants) {
-        if (item.second == noIndex || item.second == 0) {
-          descendants.erase(item.first);
-        }
+      for (auto v : verticesToRemove) {
+        descendants.erase(v);
       }
     }
   }
