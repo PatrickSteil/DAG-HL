@@ -23,6 +23,7 @@
 #include <sstream>
 #include <vector>
 
+#include "ips4o.hpp"
 #include "spinlock.h"
 #include "status_log.h"
 #include "types.h"
@@ -362,37 +363,37 @@ std::vector<Vertex> computePermutation(
   std::vector<Vertex> result;
   parallel_assign_iota(result, numVertices, Vertex(0));
 
-  std::vector<std::uint32_t> freq;
-  parallel_assign(freq, numVertices, static_cast<std::uint32_t>(0));
+  std::vector<std::atomic<uint32_t>> freq(numVertices);
+
+#pragma omp parallel for
+  for (std::size_t v = 0; v < numVertices; ++v) {
+    freq[v].store(0, std::memory_order_relaxed);
+  }
 
   for (DIRECTION dir : {FWD, BWD}) {
-    for (auto &lab : labels[dir]) {
-      for (const auto h : lab.nodes) {
-        freq[h]++;
+#pragma omp for
+    for (std::size_t v = 0; v < numVertices; ++v) {
+      for (const auto h : labels[dir][v].nodes) {
+        freq[h].fetch_add(1, std::memory_order_relaxed);
       }
     }
   }
 
   using Pair = std::pair<std::uint32_t, Vertex>;
-  std::vector<Pair> heap_data;
-  heap_data.reserve(numVertices);
+  std::vector<Pair> heap_data(numVertices);
 
+#pragma omp parallel for
   for (Vertex v = 0; v < numVertices; ++v) {
-    heap_data.emplace_back(freq[v], v);
+    heap_data[v] = {freq[v].load(std::memory_order_relaxed), v};
   }
 
-  auto cmp = [](const Pair &a, const Pair &b) { return a.first > b.first; };
-  std::make_heap(heap_data.begin(), heap_data.end(), cmp);
+  ips4o::parallel::sort(
+      heap_data.begin(), heap_data.end(),
+      [](const Pair &a, const Pair &b) { return a.first > b.first; });
 
-  Vertex id(0);
-  while (!heap_data.empty()) {
-    std::pop_heap(heap_data.begin(), heap_data.end(), cmp);
-    auto [occur, hub] = heap_data.back();
-    heap_data.pop_back();
-
-    assert(hub != noVertex);
-    result[hub] = id;
-    ++id;
+#pragma omp parallel for
+  for (Vertex id = 0; id < numVertices; ++id) {
+    result[heap_data[id].second] = id;
   }
 
   return result;
