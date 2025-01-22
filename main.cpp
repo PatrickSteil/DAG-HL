@@ -52,8 +52,6 @@ int main(int argc, char *argv[]) {
   const auto compress = parser.get<bool>("c");
   const auto run_benchmark = parser.get<bool>("b");
 
-  // Min Trees
-  const int T = 8;
   // Bitset Width
   const int K = 256;
 
@@ -92,25 +90,7 @@ int main(int argc, char *argv[]) {
 
   Graph rev = g.reverseGraph();
 
-  HLDAG<T, K, LabelThreadSafe> hl(g, rev, rank, numThreads);
-
-  /* hl.sample(); */
-  /* hl.updateDescendantCounter(); */
-
-  /* Vertex top = hl.pickBestVertex(); */
-
-  /* auto printImportance = [&](const Vertex v) -> void { */
-  /*   auto importance = getImportanceByAvg2Max(hl.valuesPerElement[v]); */
-  /*   std::cout << "Vertex: " << v << " with " << importance.first << ", " */
-  /*             << importance.second << std::endl; */
-  /* }; */
-
-  /* std::cout << "Top: " << top << std::endl; */
-
-  /* for (Vertex v = 0; v < g.numVertices(); ++v) { */
-  /*   printImportance(v); */
-  /* } */
-  /* return 0; */
+  HLDAG<K, LabelThreadSafe> hl(g, rev, rank, numThreads);
 
   hl.run(orderingFile);
 

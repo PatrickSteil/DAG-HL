@@ -30,6 +30,8 @@
 #include <stdexcept>
 #include <vector>
 
+#include "drawer.h"
+#include "forest.h"
 #include "graph.h"
 #include "hub_labels.h"
 #include "ips4o.hpp"
@@ -38,7 +40,7 @@
 #include "topological_sort.h"
 #include "utils.h"
 
-template <int WIDTH = 256, class LABEL = Label>
+template <int T = 32, int WIDTH = 256, class LABEL = Label>
 struct HLDAG {
  public:
   std::array<std::vector<LABEL>, 2> labels;
@@ -53,6 +55,10 @@ struct HLDAG {
 
   std::vector<PLL<WIDTH, LABEL>> plls;
 
+  Drawer drawer;
+  Forest<> forest;
+
+  std::vector<std::array<std::uint32_t, 16>> valuesPerElement;
   const int numThreads;
 
   HLDAG(const Graph &fwdGraph, const Graph &bwdGraph,
@@ -66,6 +72,10 @@ struct HLDAG {
                      std::vector<std::bitset<WIDTH>>()},
         plls(numThreads,
              PLL<WIDTH, LABEL>(labels, reachability, alreadyProcessed, graph)),
+        drawer(fwdGraph.numVertices()),
+        forest(fwdGraph.numVertices(),
+               std::make_shared<const std::vector<std::size_t>>(rank), T),
+        valuesPerElement(fwdGraph.numVertices()),
         numThreads(numThreads) {
     init(fwdGraph.numVertices());
   };
@@ -108,6 +118,106 @@ struct HLDAG {
         plls[0].runPrunedBFS(ordering[j]);
       }
     }
+  }
+
+  void updateTrees() {
+    assert(drawer.hasNext());
+
+    std::array<Vertex, T> pickedVertices;
+
+    std::size_t limit = std::min(static_cast<std::size_t>(T), drawer.size());
+
+    for (std::size_t i = 0; i < limit; ++i) {
+      pickedVertices[i] = drawer.draw();
+    }
+
+    for (std::size_t i = 0; i < T; ++i) {
+      auto &tree = forest[i];
+      tree.clear();
+
+      if (i < limit) {
+        plls[0].growTree(pickedVertices[i], tree);
+        // add vertex back to drawer
+        drawer.add(pickedVertices[i]);
+      }
+    }
+
+    forest.computeSubtreeSizes();
+
+    updateDescendantCounter();
+  }
+
+  // Sampling stuff
+  void sample() {
+    // - pick T vertices
+    // - grow the trees in parallel
+    // - compute descendants count
+    // - pick top K vertices one after the other
+    assert(drawer.hasNext());
+    assert(T <= drawer.size());
+
+    std::array<Vertex, T> pickedVertices;
+
+#pragma GCC unroll(4)
+    for (std::size_t i = 0; i < T; ++i) {
+      pickedVertices[i] = drawer.draw();
+    }
+
+#pragma omp parallel for num_threads(numThreads)
+    for (std::size_t i = 0; i < T; ++i) {
+      int threadId = omp_get_thread_num();
+
+      auto &tree = forest[i];
+      plls[threadId].growTree(pickedVertices[i], tree);
+
+      drawer.add(pickedVertices[i]);
+    }
+    forest.computeSubtreeSizes(numThreads);
+  }
+
+  void updateDescendantCounter() {
+#pragma omp parallel for num_threads(numThreads)
+    for (std::size_t v = 0; v < graph[FWD]->numVertices(); ++v) {
+      std::fill(std::begin(valuesPerElement[v]), std::end(valuesPerElement[v]),
+                0);
+      for (std::size_t j = 0; j < forest.numberOfTrees(); ++j) {
+        valuesPerElement[v][j % 16] += forest[j].descendants[v];
+      }
+    }
+  }
+
+  void growTree(const Vertex v, const std::size_t treeIndex,
+                const std::size_t threadId) {
+    auto &tree = forest[treeIndex];
+    plls[threadId].growTree(v, tree);
+  }
+
+  Vertex pickBestVertex() {
+    std::atomic<std::uint64_t> importance(0);
+    std::atomic<Vertex> result(noVertex);
+
+#pragma omp parallel for num_threads(numThreads)
+    for (std::size_t v = 0; v < graph[FWD]->numVertices(); ++v) {
+      if (alreadyProcessed[v].load()) continue;
+
+      auto currentImportance = getImportanceByAverage(valuesPerElement[v]);
+
+      std::uint64_t thisImportance =
+          (static_cast<std::uint64_t>(currentImportance.first) << 32) |
+          (currentImportance.second);
+
+      if (fetch_max(importance, thisImportance)) {
+        result.store(v);
+      }
+    }
+
+    Vertex v = result.load();
+    assert(v != noVertex);
+    drawer.remove(v);
+
+    std::cout << "Vertex " << result.load() << " [" << importance.load() << "]"
+              << std::endl;
+    return result.load();
   }
 
   void runSweep(const std::size_t left, const std::vector<Vertex> &ordering) {
