@@ -56,7 +56,7 @@ struct HLDAG {
   std::vector<PLL<WIDTH, LABEL>> plls;
 
   Drawer drawer;
-  Forest forest;
+  Forest<> forest;
 
   std::vector<std::array<std::uint32_t, 16>> valuesPerElement;
   const int numThreads;

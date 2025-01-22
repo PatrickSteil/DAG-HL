@@ -85,7 +85,14 @@ class EdgeTree {
 
   // Returns the capacity, i.e., if vector storage is chosen, how many vertices
   // are present
-  std::size_t capacity() const { return descendants.size(); }
+  std::size_t capacity() const {
+    if constexpr (isVectorStorage) {
+      return descendants.size();
+    }
+    if constexpr (isMapStorage) {
+      return topoRank->size();
+    }
+  }
 
   // Returns the number of edges in both directions
   std::size_t numEdges() const { return edges[FWD].size() + edges[BWD].size(); }
@@ -201,7 +208,7 @@ class EdgeTree {
     } else {
       for (auto& item : descendants) {
         if (item.second == noIndex || item.second == 0) {
-          descendants.remove(item.first);
+          descendants.erase(item.first);
         }
       }
     }
@@ -224,15 +231,26 @@ class EdgeTree {
 };
 
 using EdgeTreeVec = EdgeTree<std::vector<Index>>;
-using EdgeTreeMap = EdgeTree<std::vector<Index>>;
+using EdgeTreeMap = EdgeTree<emhash5::HashMap<Vertex, Index>>;
+
+// Define AllowedTree before Forest
+template <typename T>
+struct AllowedTree;
+
+template <>
+struct AllowedTree<EdgeTreeVec> {};
+
+template <>
+struct AllowedTree<EdgeTreeMap> {};
 
 /**
  * The forest maintains multiple trees, supporting operations for adding new
  * trees, computing subtree sizes, and removing trees or subtrees dynamically.
  * It provides parallelized methods for efficient batch operations on all trees.
  */
-struct Forest {
-  std::vector<EdgeTreeVec> trees;
+template <typename TREE_TYPE = EdgeTreeMap>
+struct Forest : private AllowedTree<TREE_TYPE> {
+  std::vector<TREE_TYPE> trees;
 
   // Maps each vertex to its topological rank
   std::shared_ptr<const std::vector<Index>> topoRank;
@@ -266,19 +284,19 @@ struct Forest {
   }
 
   // Access the i'th tree.
-  EdgeTreeVec& operator[](const std::size_t i) noexcept {
+  TREE_TYPE& operator[](const std::size_t i) noexcept {
     assert(i < trees.size());
     return trees[i];
   }
 
   // Access the i'th tree.
-  const EdgeTreeVec& operator[](const std::size_t i) const noexcept {
+  const TREE_TYPE& operator[](const std::size_t i) const noexcept {
     assert(i < trees.size());
     return trees[i];
   }
 
   // Access the i'th tree.
-  EdgeTreeVec& getTree(const std::size_t i) noexcept {
+  TREE_TYPE& getTree(const std::size_t i) noexcept {
     assert(i < trees.size());
     return trees[i];
   }
