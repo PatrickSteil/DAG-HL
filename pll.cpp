@@ -13,8 +13,8 @@
 #include <utility>
 
 #include "datastructures/graph.h"
-#include "datastructures/hldag.h"
 #include "datastructures/hub_labels.h"
+#include "datastructures/pruned_landmark_labeling.h"
 #include "external/cmdparser.hpp"
 
 void configure_parser(cli::Parser &parser) {
@@ -27,9 +27,6 @@ void configure_parser(cli::Parser &parser) {
   parser.set_optional<std::string>(
       "r", "ordering_file", "",
       "File containing the ordering and the centrality measure per line");
-  parser.set_optional<int>("t", "num_threads",
-                           std::thread::hardware_concurrency(),
-                           "Number of threads to use.");
   parser.set_optional<bool>("s", "show_stats", false,
                             "Show statistics about the computed hub labels.");
   parser.set_optional<bool>("c", "compress_labels", false,
@@ -47,20 +44,9 @@ int main(int argc, char *argv[]) {
   const std::string graphFormat = parser.get<std::string>("f");
   const std::string outputFileName = parser.get<std::string>("o");
   const std::string orderingFile = parser.get<std::string>("r");
-  const int numThreads = parser.get<int>("t");
   const auto showstats = parser.get<bool>("s");
   const auto compress = parser.get<bool>("c");
   const auto run_benchmark = parser.get<bool>("b");
-
-  // Bitset Width
-  const int K = 256;
-
-  if (numThreads <= 0) {
-    std::cout << "Number of threads should be greater than 0!" << std::endl;
-    return -1;
-  }
-
-  omp_set_num_threads(numThreads);
 
   Graph g;
   if (graphFormat == "METIS") {
@@ -81,37 +67,41 @@ int main(int argc, char *argv[]) {
     g.showStats();
   }
 
-  std::vector<std::size_t> rank(g.numVertices(), 0);
-  TopologicalSort sorter(g);
-
-  for (std::size_t i = 0; i < g.numVertices(); ++i) {
-    rank[sorter.getOrdering()[i]] = i;
-  }
-
   Graph rev = g.reverseGraph();
 
-  HLDAG<K, LabelThreadSafe> hl(g, rev, rank, numThreads);
+  std::array<std::vector<Label>, 2> labels = {
+      std::vector<Label>(g.numVertices()), std::vector<Label>(g.numVertices())};
+  std::array<std::vector<std::bitset<0>>, 2> bitsets;
+  std::vector<std::atomic<bool>> alreadyProcessed(g.numVertices());
+  for (std::size_t v = 0; v < g.numVertices(); ++v) {
+    alreadyProcessed[v] = false;
+  }
 
-  hl.run(orderingFile);
+  std::array<const Graph *, 2> graph = {&g, &rev};
+
+  PLL<0, Label> pll(labels, bitsets, alreadyProcessed, graph);
+  std::vector<Vertex> ordering = getOrdering(orderingFile, graph);
+
+  pll.run(ordering);
 
   if (compress) {
-    auto permutation = computePermutation(hl.labels);
+    auto permutation = computePermutation(labels);
 
 #pragma omp parallel for
     for (Vertex v = 0; v < g.numVertices(); ++v) {
-      hl.labels[0][v].applyPermutation(permutation);
-      hl.labels[1][v].applyPermutation(permutation);
+      labels[0][v].applyPermutation(permutation);
+      labels[1][v].applyPermutation(permutation);
     }
   }
 
-  sortLabels(hl.labels);
+  sortLabels(labels);
 
-  if (showstats) showStats(hl.labels);
+  if (showstats) showStats(labels);
 
-  if (outputFileName != "") saveToFile(hl.labels, outputFileName);
+  if (outputFileName != "") saveToFile(labels, outputFileName);
 
   if (run_benchmark) {
-    benchmark_hublabels(hl.labels, 10000);
+    benchmark_hublabels(labels, 10000);
   }
   return 0;
 }

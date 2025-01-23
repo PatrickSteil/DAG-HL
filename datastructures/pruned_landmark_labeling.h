@@ -28,6 +28,7 @@
 #include "forest.h"
 #include "graph.h"
 #include "hub_labels.h"
+#include "ips4o.hpp"
 #include "status_log.h"
 #include "utils.h"
 
@@ -63,7 +64,7 @@ struct PLL {
     init(ordering.size());
 
     for (std::size_t i = 0; i < ordering.size(); ++i) {
-      runPrunedBFS(i, ordering);
+      runPrunedBFS(ordering[i]);
     }
   }
 
@@ -74,7 +75,10 @@ struct PLL {
     lookup[BWD].assign(numVertices, 0);
     lookup[FWD].assign(numVertices, 0);
 
-    alreadyProcessed = std::vector<std::atomic<bool>>(numVertices, false);
+    alreadyProcessed = std::vector<std::atomic<bool>>(numVertices);
+    for (std::size_t v = 0; v < numVertices; ++v) {
+      alreadyProcessed[v] = false;
+    }
 
     bfs[FWD].reset(numVertices);
     bfs[BWD].reset(numVertices);
@@ -142,7 +146,7 @@ struct PLL {
           });
     };
 
-#pragma omp parallel for num_threads(2)
+    /* #pragma omp parallel for num_threads(2) */
     for (auto dir : {FWD, BWD}) {
       runOneDirection(dir);
     }
@@ -203,4 +207,78 @@ struct PLL {
     forDir(FWD);
     forDir(BWD);
   }
+
+  std::vector<Vertex> getOrdering(const std::string &fileName) {
+    std::vector<Vertex> ordering;
+    ordering.reserve(graph[FWD]->numVertices());
+
+    if (fileName == "") {
+      parallel_assign(ordering, graph[FWD]->numVertices(), Vertex(0));
+
+      std::vector<std::size_t> randomNumber;
+      parallel_assign_iota(randomNumber, graph[FWD]->numVertices(),
+                           static_cast<std::size_t>(0));
+
+      std::mt19937 g(42);
+
+      std::shuffle(randomNumber.begin(), randomNumber.end(), g);
+
+      auto degreeCompRandom = [&](const auto left, const auto right) {
+        return std::forward_as_tuple(
+                   graph[FWD]->degree(left) + graph[BWD]->degree(left),
+                   randomNumber[left]) >
+               std::forward_as_tuple(
+                   graph[FWD]->degree(right) + graph[BWD]->degree(right),
+                   randomNumber[right]);
+      };
+
+      parallel_iota(ordering, Vertex(0));
+      ips4o::parallel::sort(ordering.begin(), ordering.end(), degreeCompRandom);
+      /* std::sort(ordering.begin(), ordering.end(), degreeCompRandom); */
+      assert(
+          std::is_sorted(ordering.begin(), ordering.end(), degreeCompRandom));
+    } else {
+      std::ifstream file(fileName);
+      if (!file.is_open()) {
+        throw std::runtime_error("Failed to open file: " + fileName);
+      }
+
+      std::string line;
+      while (std::getline(file, line)) {
+        std::istringstream iss(line);
+        Vertex vertex;
+        double centrality;
+
+        if (iss >> vertex >> centrality) {
+          ordering.push_back(vertex - 1);
+        } else {
+          throw std::runtime_error("Failed to parse line: " + line);
+        }
+      }
+    }
+    return ordering;
+  }
+
+  bool isOrdering(const std::vector<Vertex> &ordering,
+                  const std::size_t numVertices) {
+    std::set<Vertex> orderedSet(ordering.begin(), ordering.end());
+
+    if (orderedSet.size() != numVertices) {
+      std::cout << "The ordering does not contain all vertices!" << std::endl;
+      std::cout << "Ordering has " << orderedSet.size() << ", but there are "
+                << numVertices << " many vertices!" << std::endl;
+      return false;
+    }
+    if (!orderedSet.contains(0)) {
+      std::cout << "The ordering does not contain 0!" << std::endl;
+      return false;
+    }
+    if (!orderedSet.contains(numVertices - 1)) {
+      std::cout << "The ordering does not contain the last vertex!"
+                << std::endl;
+      return false;
+    }
+
+    return true;
+  };
 };

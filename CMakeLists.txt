@@ -19,42 +19,48 @@ if(CMAKE_BUILD_TYPE STREQUAL "Sanitize")
     message(STATUS "Sanitizer build enabled")
 endif()
 
-set(SOURCE_FILES
-    main.cpp
-)
-
-add_executable(${PROJECT_NAME} ${SOURCE_FILES})
-target_include_directories(${PROJECT_NAME} PUBLIC datastructures)
-
+# External dependencies
 add_subdirectory(external/ips4o EXCLUDE_FROM_ALL)
-target_link_libraries(${PROJECT_NAME} PRIVATE ips4o)
 
+# Build DAGHL from main.cpp
+add_executable(DAGHL main.cpp)
+target_include_directories(DAGHL PUBLIC datastructures)
+target_link_libraries(DAGHL PRIVATE ips4o)
+
+# Build PLL from pll.cpp
+add_executable(PLL pll.cpp)
+target_include_directories(PLL PUBLIC datastructures)
+target_link_libraries(PLL PRIVATE ips4o)
+
+# Enable testing
 enable_testing()
+find_package(GTest)
 
-add_executable(unit_test 
-    tests/bfs_tools_test.cpp 
-    tests/drawer_test.cpp 
-    tests/forest_test.cpp 
-    tests/graph_test.cpp 
-    tests/priority_queue_test.cpp 
-    tests/utils_test.cpp 
-)
-target_include_directories(unit_test PUBLIC datastructures)
+if(GTest_FOUND)
+    add_executable(unit_test 
+        tests/bfs_tools_test.cpp 
+        tests/drawer_test.cpp 
+        tests/forest_test.cpp 
+        tests/graph_test.cpp 
+        tests/priority_queue_test.cpp 
+        tests/utils_test.cpp 
+    )
+    target_include_directories(unit_test PUBLIC datastructures)
+    target_link_libraries(unit_test PRIVATE GTest::gtest_main ips4o)
+    target_compile_options(unit_test PRIVATE -fopenmp)
+    add_test(NAME unit_test COMMAND unit_test)
+else()
+    message(STATUS "GoogleTest not found, skipping unit tests")
+endif()
 
-find_package(GTest REQUIRED)
-target_link_libraries(unit_test PRIVATE GTest::gtest_main)
-target_link_libraries(unit_test PRIVATE ips4o)
-
-target_compile_options(unit_test PRIVATE -fopenmp)
-add_test(NAME unit_test COMMAND unit_test)
-
+# Benchmark setup
 add_executable(benchmark_queue benchmark/queue_bench.cpp)
 target_include_directories(benchmark_queue PUBLIC datastructures benchmark)
 
-find_package(benchmark REQUIRED)
+find_package(benchmark)
+
 if(benchmark_FOUND)
-    target_link_libraries(benchmark_queue PRIVATE benchmark::benchmark benchmark::benchmark_main)
-    target_link_libraries(benchmark_queue PRIVATE ips4o)
+    target_link_libraries(benchmark_queue PRIVATE benchmark::benchmark benchmark::benchmark_main ips4o)
     if(OpenMP_CXX_FOUND)
         target_link_libraries(benchmark_queue PUBLIC OpenMP::OpenMP_CXX)
     endif()
@@ -62,12 +68,11 @@ if(benchmark_FOUND)
     # EdgeTree Benchmark
     add_executable(edgetree_bench benchmark/edgetree_bench.cpp)
     target_include_directories(edgetree_bench PUBLIC datastructures benchmark)
-    target_link_libraries(edgetree_bench PRIVATE benchmark::benchmark benchmark::benchmark_main)
-    target_link_libraries(edgetree_bench PRIVATE ips4o)
+    target_link_libraries(edgetree_bench PRIVATE benchmark::benchmark benchmark::benchmark_main ips4o)
     if(OpenMP_CXX_FOUND)
         target_link_libraries(edgetree_bench PUBLIC OpenMP::OpenMP_CXX)
     endif()
 else()
-    message(FATAL_ERROR "Google Benchmark requested but not found")
+    message(STATUS "Google Benchmark not found, skipping benchmarks")
 endif()
 

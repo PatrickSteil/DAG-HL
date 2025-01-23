@@ -22,6 +22,7 @@
 #include <queue>
 #include <sstream>
 #include <vector>
+#include <set>
 
 #include "ips4o.hpp"
 #include "spinlock.h"
@@ -435,3 +436,133 @@ void benchmark_hublabels(std::array<std::vector<LABEL>, 2> &labels,
             << totalTime << " [ms] and on average "
             << (double)(totalTime / numQueries) << " [ns]!\n";
 }
+template <typename LABEL = Label>
+std::size_t computeTotalBytes(const std::array<std::vector<LABEL>, 2> &labels) {
+  std::size_t totalBytes = 0;
+
+  for (const auto &labelSet : labels) {
+    for (const auto &label : labelSet) {
+      totalBytes += sizeof(LABEL);
+      totalBytes += label.nodes.capacity() * sizeof(Vertex);
+    }
+  }
+
+  return totalBytes;
+}
+
+template <typename LABEL = Label>
+void showStats(const std::array<std::vector<LABEL>, 2> &labels) {
+  auto computeStats = [](const std::vector<LABEL> &currentLabels) {
+    std::size_t minSize = std::numeric_limits<std::size_t>::max();
+    std::size_t maxSize = 0;
+    std::size_t totalSize = 0;
+
+    for (const auto &label : currentLabels) {
+      std::size_t size = label.size();
+      minSize = std::min(minSize, size);
+      maxSize = std::max(maxSize, size);
+      totalSize += size;
+    }
+
+    double avgSize = static_cast<double>(totalSize) / currentLabels.size();
+    return std::make_tuple(minSize, maxSize, avgSize, totalSize);
+  };
+
+  auto [inMin, inMax, inAvg, inTotal] = computeStats(labels[BWD]);
+  auto [outMin, outMax, outAvg, outTotal] = computeStats(labels[FWD]);
+
+  /* std::locale::global(std::locale("")); */
+  /* std::cout.imbue(std::locale()); */
+
+  std::cout << "Forward Labels Statistics:" << std::endl;
+  std::cout << "  Min Size:     " << outMin << std::endl;
+  std::cout << "  Max Size:     " << outMax << std::endl;
+  std::cout << "  Avg Size:     " << outAvg << std::endl;
+
+  std::cout << "Backward Labels Statistics:" << std::endl;
+  std::cout << "  Min Size:     " << inMin << std::endl;
+  std::cout << "  Max Size:     " << inMax << std::endl;
+  std::cout << "  Avg Size:     " << inAvg << std::endl;
+
+  std::cout << "FWD # count:    " << outTotal << std::endl;
+  std::cout << "BWD # count:    " << inTotal << std::endl;
+  std::cout << "Both # count:   " << (outTotal + inTotal) << std::endl;
+
+  std::cout << "Total memory consumption [megabytes]:" << std::endl;
+  std::cout << "  "
+            << static_cast<double>(computeTotalBytes(labels) /
+                                   (1024.0 * 1024.0))
+            << std::endl;
+}
+
+std::vector<Vertex> getOrdering(const std::string &fileName,
+                                const std::array<const Graph *, 2> &graph) {
+  std::vector<Vertex> ordering;
+  ordering.reserve(graph[FWD]->numVertices());
+
+  if (fileName == "") {
+    parallel_assign(ordering, graph[FWD]->numVertices(), Vertex(0));
+
+    std::vector<std::size_t> randomNumber;
+    parallel_assign_iota(randomNumber, graph[FWD]->numVertices(),
+                         static_cast<std::size_t>(0));
+
+    std::mt19937 g(42);
+
+    std::shuffle(randomNumber.begin(), randomNumber.end(), g);
+
+    auto degreeCompRandom = [&](const auto left, const auto right) {
+      return std::forward_as_tuple(
+                 graph[FWD]->degree(left) + graph[BWD]->degree(left),
+                 randomNumber[left]) >
+             std::forward_as_tuple(
+                 graph[FWD]->degree(right) + graph[BWD]->degree(right),
+                 randomNumber[right]);
+    };
+
+    parallel_iota(ordering, Vertex(0));
+    ips4o::parallel::sort(ordering.begin(), ordering.end(), degreeCompRandom);
+    assert(std::is_sorted(ordering.begin(), ordering.end(), degreeCompRandom));
+  } else {
+    std::ifstream file(fileName);
+    if (!file.is_open()) {
+      throw std::runtime_error("Failed to open file: " + fileName);
+    }
+
+    std::string line;
+    while (std::getline(file, line)) {
+      std::istringstream iss(line);
+      Vertex vertex;
+      double centrality;
+
+      if (iss >> vertex >> centrality) {
+        ordering.push_back(vertex - 1);
+      } else {
+        throw std::runtime_error("Failed to parse line: " + line);
+      }
+    }
+  }
+  return ordering;
+}
+
+bool isOrdering(const std::vector<Vertex> &ordering,
+                const std::size_t numVertices) {
+  std::set<Vertex> orderedSet(ordering.begin(), ordering.end());
+
+  if (orderedSet.size() != numVertices) {
+    std::cout << "The ordering does not contain all vertices!" << std::endl;
+    std::cout << "Ordering has " << orderedSet.size() << ", but there are "
+              << numVertices << " many vertices!" << std::endl;
+    return false;
+  }
+  if (!orderedSet.contains(0)) {
+    std::cout << "The ordering does not contain 0!" << std::endl;
+    return false;
+  }
+  if (!orderedSet.contains(numVertices - 1)) {
+    std::cout << "The ordering does not contain the last vertex!" << std::endl;
+    return false;
+  }
+
+  return true;
+};
