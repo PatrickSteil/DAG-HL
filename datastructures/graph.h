@@ -352,18 +352,12 @@ struct Graph {
       flippedAdjArray[v] += flippedAdjArray[v - 1];
     }
 
-    std::vector<std::atomic_size_t> offset(flippedAdjArray.size());
+    std::vector<std::size_t> offset = flippedAdjArray;
 
-#pragma omp parallel for
-    for (std::size_t i = 0; i < offset.size(); ++i) {
-      offset[i].store(flippedAdjArray[i], std::memory_order_relaxed);
-    }
-
-#pragma omp parallel for schedule(static)
-    for (Vertex fromV = 0; fromV < numVertices(); ++fromV) {
+    for (Vertex fromV(0); fromV < numVertices(); ++fromV) {
       for (std::size_t i = adjArray[fromV]; i < adjArray[fromV + 1]; ++i) {
         Vertex toV = toVertex[i];
-        flippedToVertex[offset[toV].fetch_add(1)] = fromV;
+        flippedToVertex[offset[toV]++] = fromV;
       }
     }
 
