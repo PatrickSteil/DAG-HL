@@ -53,19 +53,18 @@ else()
     message(STATUS "GoogleTest not found, skipping unit tests")
 endif()
 
-# Benchmark setup
-add_executable(benchmark_queue benchmark/queue_bench.cpp)
-target_include_directories(benchmark_queue PUBLIC datastructures benchmark)
 
 find_package(benchmark)
 
 if(benchmark_FOUND)
-    target_link_libraries(benchmark_queue PRIVATE benchmark::benchmark benchmark::benchmark_main ips4o)
+    add_executable(queue_bench benchmark/queue_bench.cpp)
+    target_include_directories(queue_bench PUBLIC datastructures benchmark)
+    target_link_libraries(queue_bench PRIVATE benchmark::benchmark benchmark::benchmark_main ips4o)
+
     if(OpenMP_CXX_FOUND)
-        target_link_libraries(benchmark_queue PUBLIC OpenMP::OpenMP_CXX)
+        target_link_libraries(queue_bench PUBLIC OpenMP::OpenMP_CXX)
     endif()
 
-    # EdgeTree Benchmark
     add_executable(edgetree_bench benchmark/edgetree_bench.cpp)
     target_include_directories(edgetree_bench PUBLIC datastructures benchmark)
     target_link_libraries(edgetree_bench PRIVATE benchmark::benchmark benchmark::benchmark_main ips4o)
