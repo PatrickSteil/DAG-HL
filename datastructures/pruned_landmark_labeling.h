@@ -37,18 +37,15 @@ struct PLL {
  public:
   std::array<std::vector<LABEL>, 2> &labels;
   std::array<std::vector<std::bitset<WIDTH>>, 2> &reachability;
-  std::vector<std::atomic<bool>> &alreadyProcessed;
   std::array<const Graph *, 2> &graph;
   std::array<std::vector<std::uint8_t>, 2> lookup;
   std::array<bfs::BFS, 2> bfs;
 
   PLL(std::array<std::vector<LABEL>, 2> &labels,
       std::array<std::vector<std::bitset<WIDTH>>, 2> &reachability,
-      std::vector<std::atomic<bool>> &alreadyProcessed,
       std::array<const Graph *, 2> &graph)
       : labels(labels),
         reachability(reachability),
-        alreadyProcessed(alreadyProcessed),
         graph(graph),
         lookup{std::vector<std::uint8_t>(graph[FWD]->numVertices(), 0),
                std::vector<std::uint8_t>(graph[FWD]->numVertices(), 0)},
@@ -75,11 +72,6 @@ struct PLL {
     lookup[BWD].assign(numVertices, 0);
     lookup[FWD].assign(numVertices, 0);
 
-    alreadyProcessed = std::vector<std::atomic<bool>>(numVertices);
-    for (std::size_t v = 0; v < numVertices; ++v) {
-      alreadyProcessed[v] = false;
-    }
-
     bfs[FWD].reset(numVertices);
     bfs[BWD].reset(numVertices);
   }
@@ -103,7 +95,7 @@ struct PLL {
             return false;
           },
           [&](const Vertex /* u */, const Vertex w) -> bool {
-            bool prune = alreadyProcessed[w].load(std::memory_order_relaxed);
+            bool prune = false;
             if constexpr (PRUNE_VIA_BITSET) {
               assert(reachability[dir][w].any());
               assert(reachability[!dir][v].any());
@@ -111,10 +103,9 @@ struct PLL {
               prune |= (findFirstOne(reachability[dir][w],
                                      reachability[!dir][v]) < i);
             }
+            prune |= labels[!dir][w].prune(lookup[dir]);
 
-            if (prune) return true;
-
-            return labels[!dir][w].prune(lookup[dir]);
+            return prune;
           });
     };
 
@@ -123,8 +114,6 @@ struct PLL {
     }
 
     unsetLookup(v);
-
-    alreadyProcessed[v].store(true, std::memory_order_relaxed);
   }
 
   void runPrunedBFS(const Vertex v) {
@@ -141,8 +130,8 @@ struct PLL {
             return false;
           },
           [&](const Vertex /* u */, const Vertex w) {
-            return alreadyProcessed[w].load(std::memory_order_relaxed) ||
-                   labels[!dir][w].prune(lookup[dir]);
+            bool prune = labels[!dir][w].prune(lookup[dir]);
+            return prune;
           });
     };
 
@@ -152,22 +141,17 @@ struct PLL {
     }
 
     unsetLookup(v);
-
-    alreadyProcessed[v].store(true, std::memory_order_relaxed);
   }
 
   void growTree(const Vertex v, EdgeTree<std::vector<Index>> &tree) {
     assert(v < labels[BWD].size());
-    assert(!alreadyProcessed[v].load());
-
     tree.reset(v);
 
     setLookup(v);
 
     auto runOneDirection = [&](const DIRECTION dir) -> void {
       bfs[dir].run(v, bfs::noOp, [&](const Vertex u, const Vertex w) {
-        bool prune = alreadyProcessed[w].load(std::memory_order_relaxed) ||
-                     labels[!dir][w].prune(lookup[dir]);
+        bool prune = labels[!dir][w].prune(lookup[dir]);
 
         if (!prune) {
           tree.addEdge(u, w, dir);

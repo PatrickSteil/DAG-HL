@@ -122,17 +122,14 @@ std::vector<std::pair<VALUE, VALUE>> generateRandomQueries(int numQueries,
                                                            int minVertex,
                                                            int maxVertex) {
   std::vector<std::pair<VALUE, VALUE>> queries;
+  queries.reserve(numQueries);
   std::srand(42);
 
   for (int i = 0; i < numQueries; ++i) {
     VALUE source = minVertex + std::rand() % (maxVertex - minVertex);
     VALUE target = minVertex + std::rand() % (maxVertex - minVertex);
 
-    while (source == target) {
-      target = minVertex + std::rand() % (maxVertex - minVertex + 1);
-    }
-
-    queries.emplace_back(std::min(source, target), std::max(source, target));
+    queries.emplace_back(source, target);
   }
 
   return queries;
@@ -146,5 +143,28 @@ bool fetch_max(std::atomic<T> &atomicValue, T newValue) {
       return true;
     }
   }
+  return false;
+}
+
+template <typename T>
+bool intersect(const std::vector<T> &A, const std::vector<T> &B) {
+  assert(std::is_sorted(A.begin(), A.end()));
+  assert(std::is_sorted(B.begin(), B.end()));
+
+  std::size_t i = 0;
+  std::size_t j = 0;
+
+  const std::size_t ASize = A.size();
+  const std::size_t BSize = B.size();
+
+  while (i < ASize && j < BSize) {
+    if (A[i] == B[j]) return true;
+
+    if (A[i] < B[j])
+      ++i;
+    else
+      ++j;
+  }
+
   return false;
 }

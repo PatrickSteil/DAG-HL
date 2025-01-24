@@ -41,7 +41,7 @@
 #include "utils.h"
 
 template <int T = 32, int WIDTH = 256, class LABEL = Label>
-struct HLDAG {
+struct RXLDAG {
  public:
   std::array<std::vector<LABEL>, 2> labels;
 
@@ -61,7 +61,7 @@ struct HLDAG {
   std::vector<std::array<std::uint32_t, 16>> valuesPerElement;
   const int numThreads;
 
-  HLDAG(const Graph &fwdGraph, const Graph &bwdGraph,
+  RXLDAG(const Graph &fwdGraph, const Graph &bwdGraph,
         const std::vector<std::size_t> &rankPar, const int numThreads = 1)
       : labels{std::vector<LABEL>(), std::vector<LABEL>()},
         alreadyProcessed(),

@@ -37,7 +37,6 @@
 template <typename STORAGE>
 class EdgeTree {
  public:
-  // Determine storage type (vector or unordered_map)
   static constexpr bool isVectorStorage =
       std::is_same_v<STORAGE, std::vector<Index>>;
   static constexpr bool isMapStorage =
@@ -168,11 +167,6 @@ class EdgeTree {
       return;
     }
 
-    // if the vertex is not in the tree / or a leaf, no nothing
-    if (descendants[v] == 0) {
-      return;
-    }
-
     assert(getRoot() < (*topoRank).size());
     assert(v < (*topoRank).size());
 
@@ -218,6 +212,8 @@ class EdgeTree {
       for (auto v : verticesToRemove) {
         descendants.erase(v);
       }
+
+      descendants.shrink_to_fit();
     }
   }
 

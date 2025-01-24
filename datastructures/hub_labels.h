@@ -20,9 +20,9 @@
 #include <iostream>
 #include <numeric>
 #include <queue>
+#include <set>
 #include <sstream>
 #include <vector>
-#include <set>
 
 #include "ips4o.hpp"
 #include "spinlock.h"
@@ -213,25 +213,11 @@ bool query(std::array<std::vector<LABEL>, 2> &labels, const Vertex from,
 
   if (from == to) [[unlikely]]
     return true;
-  std::size_t i = 0;
-  std::size_t j = 0;
 
   const auto &fromLabels = labels[FWD][from];
   const auto &toLabels = labels[BWD][to];
 
-  while (i < fromLabels.size() && j < toLabels.size()) {
-    assert(i < fromLabels.size());
-    assert(j < toLabels.size());
-    if (fromLabels[i] == toLabels[j]) return true;
-
-    if (fromLabels[i] < toLabels[j]) {
-      i++;
-    } else {
-      j++;
-    }
-  }
-
-  return false;
+  return intersect(fromLabels.nodes, toLabels.nodes);
 }
 
 // TODO test this method

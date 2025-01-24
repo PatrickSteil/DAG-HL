@@ -51,8 +51,11 @@ TEST(EdgeTreeTest, ComputeDescendants) {
 
     tree.computeDescendants();
 
-    EXPECT_GT(tree.descendants[0], tree.descendants[1]);
-    EXPECT_GT(tree.descendants[1], tree.descendants[3]);
+    EXPECT_EQ(tree.descendants[0], 4);
+    EXPECT_EQ(tree.descendants[1], 2);
+    EXPECT_EQ(tree.descendants[2], 0);
+    EXPECT_EQ(tree.descendants[3], 0);
+    EXPECT_EQ(tree.descendants[4], 0);
   }
   {
     std::vector<Index> topoRank = {0, 1, 2, 3, 4};
@@ -65,8 +68,10 @@ TEST(EdgeTreeTest, ComputeDescendants) {
 
     tree.computeDescendants();
 
-    EXPECT_GT(tree.descendants[0], tree.descendants[1]);
-    EXPECT_GT(tree.descendants[1], tree.descendants[3]);
+    EXPECT_EQ(tree.descendants[0], 4);
+    EXPECT_EQ(tree.descendants[1], 2);
+    EXPECT_EQ(tree.descendants[2], 0);
+    EXPECT_EQ(tree.descendants[3], 0);
   }
 }
 

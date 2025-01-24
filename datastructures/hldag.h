@@ -43,7 +43,6 @@ struct HLDAG {
  public:
   std::array<std::vector<LABEL>, 2> labels;
 
-  std::vector<std::atomic<bool>> alreadyProcessed;
   std::array<const Graph *, 2> graph;
   std::vector<std::size_t> rank;
 
@@ -58,14 +57,12 @@ struct HLDAG {
   HLDAG(const Graph &fwdGraph, const Graph &bwdGraph,
         const std::vector<std::size_t> &rankPar, const int numThreads = 1)
       : labels{std::vector<LABEL>(), std::vector<LABEL>()},
-        alreadyProcessed(),
         graph{&fwdGraph, &bwdGraph},
         rank(rankPar),
         edges(),
         reachability{std::vector<std::bitset<WIDTH>>(),
                      std::vector<std::bitset<WIDTH>>()},
-        plls(numThreads,
-             PLL<WIDTH, LABEL>(labels, reachability, alreadyProcessed, graph)),
+        plls(numThreads, PLL<WIDTH, LABEL>(labels, reachability, graph)),
         numThreads(numThreads) {
     init(fwdGraph.numVertices());
   };
@@ -161,8 +158,6 @@ struct HLDAG {
 
     parallel_assign(labels[BWD], numVertices, LABEL());
     parallel_assign(labels[FWD], numVertices, LABEL());
-
-    alreadyProcessed = std::vector<std::atomic<bool>>(numVertices);
 
     edges.reserve(graph[FWD]->numEdges());
 

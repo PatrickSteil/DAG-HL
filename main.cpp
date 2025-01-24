@@ -12,6 +12,7 @@
 #include <thread>
 #include <utility>
 
+#include "datastructures/drawer.h"
 #include "datastructures/graph.h"
 #include "datastructures/hldag.h"
 #include "datastructures/hub_labels.h"
@@ -53,7 +54,7 @@ int main(int argc, char *argv[]) {
   const auto run_benchmark = parser.get<bool>("b");
 
   // Bitset Width
-  const int K = 256;
+  const int K = 128;
 
   if (numThreads <= 0) {
     std::cout << "Number of threads should be greater than 0!" << std::endl;
@@ -113,5 +114,52 @@ int main(int argc, char *argv[]) {
   if (run_benchmark) {
     benchmark_hublabels(hl.labels, 10000);
   }
+
+#ifdef VERIFY 
+  std::cout << "Verify Hub Labels:" << std::endl;
+
+  bool everythingFine = true;
+
+  std::array<bfs::BFS, 2> bfs{bfs::BFS(g), bfs::BFS(rev)};
+
+  Drawer drawer(g.numVertices());
+
+  for (int i = 0; i < 100 && drawer.hasNext(); ++i) {
+    Vertex v = drawer.draw();
+
+    bfs[FWD].run(
+        v,
+        [&](const Vertex w) {
+          bool found = query(hl.labels, v, w);
+
+          if (!found) {
+            everythingFine = false;
+            std::cerr << "FWD Path from " << v << " to " << w << " not covered!"
+                      << std::endl;
+          }
+          return false;
+        },
+        [](const Vertex, const Vertex) { return false; });
+
+    bfs[BWD].run(
+        v,
+        [&](const Vertex w) {
+          bool found = query(hl.labels, w, v);
+
+          if (!found) {
+            everythingFine = false;
+            std::cerr << "BWD: Path from " << w << " to " << v
+                      << " not covered!" << std::endl;
+          }
+          return false;
+        },
+        [](const Vertex, const Vertex) { return false; });
+  }
+
+  if (everythingFine)
+    std::cout << "Verifyer did not find anything wrong!" << std::endl;
+  else
+    std::cout << "Verifyer did find something wrong!" << std::endl;
+#endif
   return 0;
 }

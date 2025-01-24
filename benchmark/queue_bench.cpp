@@ -59,51 +59,81 @@ static void BenchmarkQueue(benchmark::State& state) {
 BENCHMARK_TEMPLATE(BenchmarkQueue, MutexQueue<std::size_t>)->Args({1 << 10, 2});
 BENCHMARK_TEMPLATE(BenchmarkQueue, MutexQueue<std::size_t>)->Args({1 << 10, 4});
 BENCHMARK_TEMPLATE(BenchmarkQueue, MutexQueue<std::size_t>)->Args({1 << 10, 8});
-BENCHMARK_TEMPLATE(BenchmarkQueue, MutexQueue<std::size_t>)->Args({1 << 10, 16});
+BENCHMARK_TEMPLATE(BenchmarkQueue, MutexQueue<std::size_t>)
+    ->Args({1 << 10, 16});
 BENCHMARK_TEMPLATE(BenchmarkQueue, MutexQueue<std::size_t>)->Args({1 << 11, 2});
 BENCHMARK_TEMPLATE(BenchmarkQueue, MutexQueue<std::size_t>)->Args({1 << 11, 4});
 BENCHMARK_TEMPLATE(BenchmarkQueue, MutexQueue<std::size_t>)->Args({1 << 11, 8});
-BENCHMARK_TEMPLATE(BenchmarkQueue, MutexQueue<std::size_t>)->Args({1 << 11, 16});
+BENCHMARK_TEMPLATE(BenchmarkQueue, MutexQueue<std::size_t>)
+    ->Args({1 << 11, 16});
 BENCHMARK_TEMPLATE(BenchmarkQueue, MutexQueue<std::size_t>)->Args({1 << 12, 2});
 BENCHMARK_TEMPLATE(BenchmarkQueue, MutexQueue<std::size_t>)->Args({1 << 12, 4});
 BENCHMARK_TEMPLATE(BenchmarkQueue, MutexQueue<std::size_t>)->Args({1 << 12, 8});
-BENCHMARK_TEMPLATE(BenchmarkQueue, MutexQueue<std::size_t>)->Args({1 << 12, 16});
+BENCHMARK_TEMPLATE(BenchmarkQueue, MutexQueue<std::size_t>)
+    ->Args({1 << 12, 16});
 BENCHMARK_TEMPLATE(BenchmarkQueue, MutexQueue<std::size_t>)->Args({1 << 13, 2});
 BENCHMARK_TEMPLATE(BenchmarkQueue, MutexQueue<std::size_t>)->Args({1 << 13, 4});
 BENCHMARK_TEMPLATE(BenchmarkQueue, MutexQueue<std::size_t>)->Args({1 << 13, 8});
-BENCHMARK_TEMPLATE(BenchmarkQueue, MutexQueue<std::size_t>)->Args({1 << 13, 16});
+BENCHMARK_TEMPLATE(BenchmarkQueue, MutexQueue<std::size_t>)
+    ->Args({1 << 13, 16});
 BENCHMARK_TEMPLATE(BenchmarkQueue, MutexQueue<std::size_t>)->Args({1 << 14, 2});
 BENCHMARK_TEMPLATE(BenchmarkQueue, MutexQueue<std::size_t>)->Args({1 << 14, 4});
 BENCHMARK_TEMPLATE(BenchmarkQueue, MutexQueue<std::size_t>)->Args({1 << 14, 8});
-BENCHMARK_TEMPLATE(BenchmarkQueue, MutexQueue<std::size_t>)->Args({1 << 14, 16});
+BENCHMARK_TEMPLATE(BenchmarkQueue, MutexQueue<std::size_t>)
+    ->Args({1 << 14, 16});
 BENCHMARK_TEMPLATE(BenchmarkQueue, MutexQueue<std::size_t>)->Args({1 << 15, 2});
 BENCHMARK_TEMPLATE(BenchmarkQueue, MutexQueue<std::size_t>)->Args({1 << 15, 4});
 BENCHMARK_TEMPLATE(BenchmarkQueue, MutexQueue<std::size_t>)->Args({1 << 15, 8});
-BENCHMARK_TEMPLATE(BenchmarkQueue, MutexQueue<std::size_t>)->Args({1 << 15, 16});
+BENCHMARK_TEMPLATE(BenchmarkQueue, MutexQueue<std::size_t>)
+    ->Args({1 << 15, 16});
 
-BENCHMARK_TEMPLATE(BenchmarkQueue, SpinlockQueue<std::size_t>)->Args({1 << 10, 2});
-BENCHMARK_TEMPLATE(BenchmarkQueue, SpinlockQueue<std::size_t>)->Args({1 << 10, 4});
-BENCHMARK_TEMPLATE(BenchmarkQueue, SpinlockQueue<std::size_t>)->Args({1 << 10, 8});
-BENCHMARK_TEMPLATE(BenchmarkQueue, SpinlockQueue<std::size_t>)->Args({1 << 10, 16});
-BENCHMARK_TEMPLATE(BenchmarkQueue, SpinlockQueue<std::size_t>)->Args({1 << 11, 2});
-BENCHMARK_TEMPLATE(BenchmarkQueue, SpinlockQueue<std::size_t>)->Args({1 << 11, 4});
-BENCHMARK_TEMPLATE(BenchmarkQueue, SpinlockQueue<std::size_t>)->Args({1 << 11, 8});
-BENCHMARK_TEMPLATE(BenchmarkQueue, SpinlockQueue<std::size_t>)->Args({1 << 11, 16});
-BENCHMARK_TEMPLATE(BenchmarkQueue, SpinlockQueue<std::size_t>)->Args({1 << 12, 2});
-BENCHMARK_TEMPLATE(BenchmarkQueue, SpinlockQueue<std::size_t>)->Args({1 << 12, 4});
-BENCHMARK_TEMPLATE(BenchmarkQueue, SpinlockQueue<std::size_t>)->Args({1 << 12, 8});
-BENCHMARK_TEMPLATE(BenchmarkQueue, SpinlockQueue<std::size_t>)->Args({1 << 12, 16});
-BENCHMARK_TEMPLATE(BenchmarkQueue, SpinlockQueue<std::size_t>)->Args({1 << 13, 2});
-BENCHMARK_TEMPLATE(BenchmarkQueue, SpinlockQueue<std::size_t>)->Args({1 << 13, 4});
-BENCHMARK_TEMPLATE(BenchmarkQueue, SpinlockQueue<std::size_t>)->Args({1 << 13, 8});
-BENCHMARK_TEMPLATE(BenchmarkQueue, SpinlockQueue<std::size_t>)->Args({1 << 13, 16});
-BENCHMARK_TEMPLATE(BenchmarkQueue, SpinlockQueue<std::size_t>)->Args({1 << 14, 2});
-BENCHMARK_TEMPLATE(BenchmarkQueue, SpinlockQueue<std::size_t>)->Args({1 << 14, 4});
-BENCHMARK_TEMPLATE(BenchmarkQueue, SpinlockQueue<std::size_t>)->Args({1 << 14, 8});
-BENCHMARK_TEMPLATE(BenchmarkQueue, SpinlockQueue<std::size_t>)->Args({1 << 14, 16});
-BENCHMARK_TEMPLATE(BenchmarkQueue, SpinlockQueue<std::size_t>)->Args({1 << 15, 2});
-BENCHMARK_TEMPLATE(BenchmarkQueue, SpinlockQueue<std::size_t>)->Args({1 << 15, 4});
-BENCHMARK_TEMPLATE(BenchmarkQueue, SpinlockQueue<std::size_t>)->Args({1 << 15, 8});
-BENCHMARK_TEMPLATE(BenchmarkQueue, SpinlockQueue<std::size_t>)->Args({1 << 15, 16});
+BENCHMARK_TEMPLATE(BenchmarkQueue, SpinlockQueue<std::size_t>)
+    ->Args({1 << 10, 2});
+BENCHMARK_TEMPLATE(BenchmarkQueue, SpinlockQueue<std::size_t>)
+    ->Args({1 << 10, 4});
+BENCHMARK_TEMPLATE(BenchmarkQueue, SpinlockQueue<std::size_t>)
+    ->Args({1 << 10, 8});
+BENCHMARK_TEMPLATE(BenchmarkQueue, SpinlockQueue<std::size_t>)
+    ->Args({1 << 10, 16});
+BENCHMARK_TEMPLATE(BenchmarkQueue, SpinlockQueue<std::size_t>)
+    ->Args({1 << 11, 2});
+BENCHMARK_TEMPLATE(BenchmarkQueue, SpinlockQueue<std::size_t>)
+    ->Args({1 << 11, 4});
+BENCHMARK_TEMPLATE(BenchmarkQueue, SpinlockQueue<std::size_t>)
+    ->Args({1 << 11, 8});
+BENCHMARK_TEMPLATE(BenchmarkQueue, SpinlockQueue<std::size_t>)
+    ->Args({1 << 11, 16});
+BENCHMARK_TEMPLATE(BenchmarkQueue, SpinlockQueue<std::size_t>)
+    ->Args({1 << 12, 2});
+BENCHMARK_TEMPLATE(BenchmarkQueue, SpinlockQueue<std::size_t>)
+    ->Args({1 << 12, 4});
+BENCHMARK_TEMPLATE(BenchmarkQueue, SpinlockQueue<std::size_t>)
+    ->Args({1 << 12, 8});
+BENCHMARK_TEMPLATE(BenchmarkQueue, SpinlockQueue<std::size_t>)
+    ->Args({1 << 12, 16});
+BENCHMARK_TEMPLATE(BenchmarkQueue, SpinlockQueue<std::size_t>)
+    ->Args({1 << 13, 2});
+BENCHMARK_TEMPLATE(BenchmarkQueue, SpinlockQueue<std::size_t>)
+    ->Args({1 << 13, 4});
+BENCHMARK_TEMPLATE(BenchmarkQueue, SpinlockQueue<std::size_t>)
+    ->Args({1 << 13, 8});
+BENCHMARK_TEMPLATE(BenchmarkQueue, SpinlockQueue<std::size_t>)
+    ->Args({1 << 13, 16});
+BENCHMARK_TEMPLATE(BenchmarkQueue, SpinlockQueue<std::size_t>)
+    ->Args({1 << 14, 2});
+BENCHMARK_TEMPLATE(BenchmarkQueue, SpinlockQueue<std::size_t>)
+    ->Args({1 << 14, 4});
+BENCHMARK_TEMPLATE(BenchmarkQueue, SpinlockQueue<std::size_t>)
+    ->Args({1 << 14, 8});
+BENCHMARK_TEMPLATE(BenchmarkQueue, SpinlockQueue<std::size_t>)
+    ->Args({1 << 14, 16});
+BENCHMARK_TEMPLATE(BenchmarkQueue, SpinlockQueue<std::size_t>)
+    ->Args({1 << 15, 2});
+BENCHMARK_TEMPLATE(BenchmarkQueue, SpinlockQueue<std::size_t>)
+    ->Args({1 << 15, 4});
+BENCHMARK_TEMPLATE(BenchmarkQueue, SpinlockQueue<std::size_t>)
+    ->Args({1 << 15, 8});
+BENCHMARK_TEMPLATE(BenchmarkQueue, SpinlockQueue<std::size_t>)
+    ->Args({1 << 15, 16});
 
 BENCHMARK_MAIN();

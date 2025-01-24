@@ -72,14 +72,10 @@ int main(int argc, char *argv[]) {
   std::array<std::vector<Label>, 2> labels = {
       std::vector<Label>(g.numVertices()), std::vector<Label>(g.numVertices())};
   std::array<std::vector<std::bitset<0>>, 2> bitsets;
-  std::vector<std::atomic<bool>> alreadyProcessed(g.numVertices());
-  for (std::size_t v = 0; v < g.numVertices(); ++v) {
-    alreadyProcessed[v] = false;
-  }
 
   std::array<const Graph *, 2> graph = {&g, &rev};
 
-  PLL<0, Label> pll(labels, bitsets, alreadyProcessed, graph);
+  PLL<0, Label> pll(labels, bitsets, graph);
   std::vector<Vertex> ordering = getOrdering(orderingFile, graph);
 
   pll.run(ordering);
