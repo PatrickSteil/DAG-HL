@@ -2,14 +2,14 @@
 #
 max_cores=$(nproc)
 
-for dimacs_file in data/*.dimacs; do
-    echo "Processing file: $dimacs_file"
+for file in data/snap/*; do
+    echo "Processing file: $file"
 
     threads=1
     while [ $threads -le $max_cores ]; do
         echo "Running with $threads threads"
 
-        ./build-release/DAGHL -i "$dimacs_file" -t "$threads"
+        ./build-release/DAGHL -s -i "$file" -f SNAP -t "$threads"
 
         threads=$((threads * 2))
     done

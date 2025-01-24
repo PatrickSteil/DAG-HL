@@ -10,6 +10,8 @@ SNAP_LINKS=(
   "https://snap.stanford.edu/data/soc-Epinions1.txt.gz"
   "https://snap.stanford.edu/data/as-skitter.txt.gz"
   "https://snap.stanford.edu/data/web-BerkStan.txt.gz"
+  "https://snap.stanford.edu/data/soc-LiveJournal1.txt.gz"
+  "https://snap.stanford.edu/data/bigdata/communities/com-youtube.ungraph.txt.gz"
 )
 
 for URL in "${SNAP_LINKS[@]}"; do
