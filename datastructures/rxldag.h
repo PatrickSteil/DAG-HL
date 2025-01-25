@@ -62,7 +62,7 @@ struct RXLDAG {
   const int numThreads;
 
   RXLDAG(const Graph &fwdGraph, const Graph &bwdGraph,
-        const std::vector<std::size_t> &rankPar, const int numThreads = 1)
+         const std::vector<std::size_t> &rankPar, const int numThreads = 1)
       : labels{std::vector<LABEL>(), std::vector<LABEL>()},
         alreadyProcessed(),
         graph{&fwdGraph, &bwdGraph},

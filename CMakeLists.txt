@@ -27,6 +27,11 @@ add_executable(DAGHL main.cpp)
 target_include_directories(DAGHL PUBLIC datastructures)
 target_link_libraries(DAGHL PRIVATE ips4o)
 
+# Build Benchmark-DAGHL from main.cpp
+add_executable(hldag_bench benchmark/hldag_bench.cpp)
+target_include_directories(hldag_bench PUBLIC datastructures)
+target_link_libraries(hldag_bench PRIVATE ips4o)
+
 # Build PLL from pll.cpp
 add_executable(PLL pll.cpp)
 target_include_directories(PLL PUBLIC datastructures)

@@ -115,7 +115,7 @@ int main(int argc, char *argv[]) {
     benchmark_hublabels(hl.labels, 10000);
   }
 
-#ifdef VERIFY 
+#ifdef VERIFY
   std::cout << "Verify Hub Labels:" << std::endl;
 
   bool everythingFine = true;
