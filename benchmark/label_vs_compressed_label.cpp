@@ -17,6 +17,7 @@ int main(int argc, char *argv[]) {
 
   std::size_t mem_raw_bytes = 0;
   std::size_t mem_compressed_bytes = 0;
+  std::size_t mem_simple_compressed_bytes = 0;
 
   std::array<std::vector<Label>, 2> labels;
 
@@ -28,63 +29,124 @@ int main(int argc, char *argv[]) {
 
   mem_raw_bytes = computeTotalBytes(labels);
 
-  std::array<std::vector<CompressedLabel>, 2> comp_labels;
+  {
+    std::array<std::vector<CompressedLabel>, 2> comp_labels;
 
-  comp_labels[FWD].reserve(labels[FWD].size());
-  comp_labels[BWD].reserve(labels[BWD].size());
+    comp_labels[FWD].reserve(labels[FWD].size());
+    comp_labels[BWD].reserve(labels[BWD].size());
 
-  for (std::size_t v = 0; v < labels[FWD].size(); ++v) {
-    comp_labels[FWD].emplace_back(labels[FWD][v]);
-    comp_labels[BWD].emplace_back(labels[BWD][v]);
+    for (std::size_t v = 0; v < labels[FWD].size(); ++v) {
+      comp_labels[FWD].emplace_back(labels[FWD][v]);
+      comp_labels[BWD].emplace_back(labels[BWD][v]);
+    }
+
+    for (std::size_t v = 0; v < comp_labels[FWD].size(); ++v) {
+      mem_compressed_bytes += comp_labels[FWD][v].byteSize();
+      mem_compressed_bytes += comp_labels[BWD][v].byteSize();
+    }
   }
+  {
+    std::array<std::vector<SimpleCompressedLabel>, 2> comp_labels;
 
-  for (std::size_t v = 0; v < comp_labels[FWD].size(); ++v) {
-    mem_compressed_bytes += comp_labels[FWD][v].nodes.byteSize();
-    mem_compressed_bytes += comp_labels[BWD][v].nodes.byteSize();
+    comp_labels[FWD].reserve(labels[FWD].size());
+    comp_labels[BWD].reserve(labels[BWD].size());
+
+    for (std::size_t v = 0; v < labels[FWD].size(); ++v) {
+      comp_labels[FWD].emplace_back(labels[FWD][v]);
+      comp_labels[BWD].emplace_back(labels[BWD][v]);
+    }
+
+    for (std::size_t v = 0; v < comp_labels[FWD].size(); ++v) {
+      mem_simple_compressed_bytes += comp_labels[FWD][v].byteSize();
+      mem_simple_compressed_bytes += comp_labels[BWD][v].byteSize();
+    }
   }
-
-  std::cout << "Memory [mb]: " << std::endl;
-  std::cout << "Raw:         " << (mem_raw_bytes / (1024 * 1024)) << std::endl;
-  std::cout << "Compressed:  " << (mem_compressed_bytes / (1024 * 1024))
+  std::cout << "Memory [mb]:        " << std::endl;
+  std::cout << "Raw:                " << (mem_raw_bytes / (1024 * 1024))
             << std::endl;
+  std::cout << "Compressed:         " << (mem_compressed_bytes / (1024 * 1024))
+            << std::endl;
+  std::cout << "Simple Compressed:  "
+            << (mem_simple_compressed_bytes / (1024 * 1024)) << std::endl;
 
   return 0;
 }
 
 /*
-./LabelVSCompLabel -i ../data/icice.labels 
+# this is without -c (compress)
+./LabelVSCompLabel -i ../data/icice.labels
 Forward Labels Statistics:
   Min Size:     1
   Max Size:     222
-  Avg Size:     64.7671
+  Avg Size:     64.8244
 Backward Labels Statistics:
   Min Size:     1
-  Max Size:     134
-  Avg Size:     42.7313
-FWD # count:    12051083
-BWD # count:    7950923
-Both # count:   20002006
+  Max Size:     133
+  Avg Size:     42.7774
+FWD # count:    12061749
+BWD # count:    7959504
+Both # count:   20021253
 Total memory consumption [megabytes]:
-  117.277
-Memory [mb]: 
-Raw:         117
-Compressed:  67
+  117.453
+Memory [mb]:
+Raw:                117
+Compressed:         78
+Simple Compressed:  125
 
 ./LabelVSCompLabel -i ../data/kvv.labels
 Forward Labels Statistics:
   Min Size:     1
   Max Size:     240
-  Avg Size:     78.5585
+  Avg Size:     78.5587
 Backward Labels Statistics:
   Min Size:     1
   Max Size:     227
   Avg Size:     69.6286
-FWD # count:    198548051
-BWD # count:    175978603
-Both # count:   374526654
+FWD # count:    198548559
+BWD # count:    175978560
+Both # count:   374527119
+Total memory consumption [megabytes]:
+  2149.56
+Memory [mb]:
+Raw:                2149
+Compressed:         1431
+Simple Compressed:  2265
+
+# this is with -c (compress)
+Forward Labels Statistics:
+  Min Size:     1
+  Max Size:     222
+  Avg Size:     64.8377
+Backward Labels Statistics:
+  Min Size:     1
+  Max Size:     133
+  Avg Size:     42.776
+FWD # count:    12064218
+BWD # count:    7959240
+Both # count:   20023458
+Total memory consumption [megabytes]:
+  117.455
+Memory [mb]:
+Raw:                117
+Compressed:         58
+Simple Compressed:  103
+
+./LabelVSCompLabel -i ../data/kvv.labels
+Forward Labels Statistics:
+  Min Size:     1
+  Max Size:     240
+  Avg Size:     78.5586
+Backward Labels Statistics:
+  Min Size:     1
+  Max Size:     227
+  Avg Size:     69.6287
+FWD # count:    198548139
+BWD # count:    175978837
+Both # count:   374526976
 Total memory consumption [megabytes]:
   2149.57
 Memory [mb]:
-Raw:         2149
-Compressed:  1277
+Raw:                2149
+Compressed:         1130
+Simple Compressed:  2089
 */

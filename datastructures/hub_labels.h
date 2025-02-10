@@ -207,6 +207,37 @@ struct CompressedLabel {
   CompressedLabel(const Label &other) : nodes(other.nodes) {}
 
   std::size_t size() const { return nodes.size(); };
+
+  std::size_t byteSize() const { return sizeof(*this) + nodes.byteSize(); }
+};
+
+struct SimpleCompressedLabel {
+  std::vector<std::uint8_t> nodes_small;
+  std::vector<std::uint32_t> nodes_large;
+
+  SimpleCompressedLabel(){};
+  SimpleCompressedLabel(const SimpleCompressedLabel &other)
+      : nodes_small(other.nodes_small), nodes_large(other.nodes_large) {}
+  SimpleCompressedLabel(SimpleCompressedLabel &&other) noexcept
+      : nodes_small(std::move(other.nodes_small)),
+        nodes_large(std::move(other.nodes_large)) {}
+
+  SimpleCompressedLabel(const Label &other) : nodes_small(), nodes_large() {
+    for (auto v : other.nodes) {
+      if (v < 256) {
+        nodes_small.push_back(v);
+      } else {
+        nodes_large.push_back(v);
+      }
+    }
+  }
+
+  std::size_t size() const { return nodes_small.size() + nodes_large.size(); }
+
+  std::size_t byteSize() const {
+    return sizeof(*this) + nodes_small.capacity() * sizeof(std::uint8_t) +
+           nodes_large.capacity() * sizeof(std::uint32_t);
+  }
 };
 
 template <class LABEL = Label>
