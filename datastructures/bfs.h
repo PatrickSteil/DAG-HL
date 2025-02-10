@@ -139,38 +139,46 @@ struct BFSParallelFrontier {
     std::size_t right = write.load(std::memory_order_acquire);
 
     assert(left <= right);
-    // if right == q.size(), then we already added all the vertices to the queue
     assert(right <= q.size());
 
-#pragma omp parallel for schedule(dynamic, 4)
-    for (std::size_t i = left; i < right; ++i) {
-      const Vertex u = q[i];
-
+    constexpr std::size_t CHUNK_SIZE = 32;  // Experiment with this value
+#pragma omp parallel
+    {
       int tId = omp_get_thread_num();
       auto &myCache = local_cache[tId];
-
-      if (onPop(u)) continue;
-
-      for (std::size_t i = graph.beginEdge(u), end = graph.endEdge(u); i < end;
-           ++i) {
-        const Vertex w = graph.toVertex[i];
-
-        if (seen.isMarked(w)) continue;
-        seen.mark(w);
-
-        if (onRelax(u, w)) {
-          continue;
-        }
-
-        myCache.push_back(w);
-      }
-      if (myCache.empty()) continue;
-      std::size_t pos =
-          write.fetch_add(myCache.size(), std::memory_order_release);
-      assert(pos + myCache.size() <= q.size());
-      std::copy(myCache.begin(), myCache.end(), q.begin() + pos);
       myCache.clear();
+
+#pragma omp for schedule(dynamic, CHUNK_SIZE)
+      for (std::size_t i = left; i < right; ++i) {
+        const Vertex u = q[i];
+
+        if (onPop(u)) continue;
+
+        for (std::size_t j = graph.beginEdge(u), end = graph.endEdge(u);
+             j < end; ++j) {
+          if (j + 4 < end) {
+            PREFETCH(&graph.toVertex[j + 4]);
+          }
+          const Vertex w = graph.toVertex[j];
+
+          if (seen.isMarked(w)) continue;
+          seen.mark(w);
+
+          if (onRelax(u, w)) continue;
+
+          myCache.push_back(w);
+        }
+      }
+
+      // Aggregate results
+      if (!myCache.empty()) {
+        std::size_t pos =
+            write.fetch_add(myCache.size(), std::memory_order_release);
+        assert(pos + myCache.size() <= q.size());
+        std::copy(myCache.begin(), myCache.end(), q.begin() + pos);
+      }
     }
+
     read.store(right, std::memory_order_release);
   }
 

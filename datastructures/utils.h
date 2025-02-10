@@ -168,3 +168,21 @@ bool intersect(const std::vector<T> &A, const std::vector<T> &B) {
 
   return false;
 }
+
+template <typename Iterator>
+bool intersect(Iterator A_begin, Iterator A_end, Iterator B_begin,
+               Iterator B_end) {
+  Iterator it_A = A_begin;
+  Iterator it_B = B_begin;
+
+  while (it_A != A_end && it_B != B_end) {
+    if (*it_A == *it_B) return true;
+
+    if (*it_A < *it_B)
+      ++it_A;
+    else
+      ++it_B;
+  }
+
+  return false;
+}

@@ -45,6 +45,7 @@ if(GTest_FOUND)
     add_executable(unit_test 
         tests/bfs_tools_test.cpp 
         tests/drawer_test.cpp 
+        tests/compressed_vector_test.cpp
         tests/forest_test.cpp 
         tests/graph_test.cpp 
         tests/priority_queue_test.cpp 

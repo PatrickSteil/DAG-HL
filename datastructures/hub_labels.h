@@ -24,6 +24,7 @@
 #include <sstream>
 #include <vector>
 
+#include "compressed_vector.h"
 #include "ips4o.hpp"
 #include "spinlock.h"
 #include "status_log.h"
@@ -124,7 +125,6 @@ struct Label {
 
 struct LabelThreadSafe : Label {
   mutable Spinlock mutex;
-  /* mutable std::mutex mutex; */
 
   LabelThreadSafe() {}
 
@@ -135,7 +135,6 @@ struct LabelThreadSafe : Label {
   LabelThreadSafe &operator=(const LabelThreadSafe &other) {
     if (this != &other) {
       std::lock_guard<Spinlock> lock(mutex);
-      /* std::lock_guard<std::mutex> lock(mutex); */
       Label::operator=(other);
     }
     return *this;
@@ -144,7 +143,6 @@ struct LabelThreadSafe : Label {
   LabelThreadSafe &operator=(LabelThreadSafe &&other) noexcept {
     if (this != &other) {
       std::lock_guard<Spinlock> lock(mutex);
-      /* std::lock_guard<std::mutex> lock(mutex); */
       Label::operator=(std::move(other));
     }
     return *this;
@@ -152,20 +150,17 @@ struct LabelThreadSafe : Label {
 
   void add(const Vertex hub) {
     std::lock_guard<Spinlock> lock(mutex);
-    /* std::lock_guard<std::mutex> lock(mutex); */
     nodes.push_back(hub);
   };
 
   bool contains(const Vertex hub) {
     std::lock_guard<Spinlock> lock(mutex);
-    /* std::lock_guard<std::mutex> lock(mutex); */
     return std::find(nodes.begin(), nodes.end(), hub) != nodes.end();
   };
 
   template <typename FUNC>
   void doForAll(FUNC &&apply) {
     std::lock_guard<Spinlock> lock(mutex);
-    /* std::lock_guard<std::mutex> lock(mutex); */
     for (std::size_t i = 0; i < nodes.size(); ++i) {
       auto &h = nodes[i];
       apply(h);
@@ -175,13 +170,11 @@ struct LabelThreadSafe : Label {
   template <typename FUNC>
   bool appliesToAny(FUNC &&toVerfiy) const {
     std::lock_guard<Spinlock> lock(mutex);
-    /* std::lock_guard<std::mutex> lock(mutex); */
     return std::any_of(nodes.begin(), nodes.end(), toVerfiy);
   }
 
   bool prune(const std::vector<std::uint8_t> &lookup) {
     std::lock_guard<Spinlock> lock(mutex);
-    /* std::lock_guard<std::mutex> lock(mutex); */
     for (std::size_t i = 0; i < nodes.size(); ++i) {
       if (i + 4 < nodes.size()) {
         PREFETCH(&lookup[nodes[i + 4]]);
@@ -197,10 +190,22 @@ struct LabelThreadSafe : Label {
 
   void sort() {
     std::lock_guard<Spinlock> lock(mutex);
-    /* std::lock_guard<std::mutex> lock(mutex); */
     std::sort(nodes.begin(), nodes.end());
   }
   // all other methods will likely not be called in parallel
+};
+
+struct CompressedLabel {
+  CompressedVector nodes;
+
+  CompressedLabel(){};
+  CompressedLabel(const CompressedLabel &other) : nodes(other.nodes) {}
+  CompressedLabel(CompressedLabel &&other) noexcept
+      : nodes(std::move(other.nodes)) {}
+
+  CompressedLabel(const Label &other) : nodes(other.nodes) {}
+
+  std::size_t size() const { return nodes.size(); };
 };
 
 template <class LABEL = Label>
@@ -217,7 +222,8 @@ bool query(std::array<std::vector<LABEL>, 2> &labels, const Vertex from,
   const auto &fromLabels = labels[FWD][from];
   const auto &toLabels = labels[BWD][to];
 
-  return intersect(fromLabels.nodes, toLabels.nodes);
+  return intersect(fromLabels.nodes.begin(), fromLabels.nodes.end(),
+                   toLabels.nodes.begin(), toLabels.nodes.end());
 }
 
 // TODO test this method
