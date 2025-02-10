@@ -1,7 +1,10 @@
 #!/bin/bash
 
 cd ../build-release/
-./edgetree_bench --benchmark_format=csv > ../benchmark/benchmark_results.csv
+make
+./edgetree_bench --benchmark_format=csv > ../benchmark/benchmark_edge_tree.csv
+./compress_vector_bench --benchmark_format=csv > ../benchmark/benchmark_compress_vector.csv
 
 cd ../benchmark/
 python3 plot.py
+python3 plot_compressed_vector.py

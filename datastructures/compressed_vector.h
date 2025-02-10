@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <iostream>
 #include <iterator>
+#include <utility>
 #include <vector>
 
 /*
@@ -33,16 +34,43 @@ class CompressedVector {
   // Constructs a CompressedVector from an existing vector of 32-bit unsigned
   // integers.
   explicit CompressedVector(const std::vector<std::uint32_t>& numbers) {
-    reserve(numbers.size() * 3);
+    reserve(numbers.size() * 5);  // Reserve space more accurately
     for (std::uint32_t num : numbers) {
       push_back(num);
     }
-
-    data.shrink_to_fit();
   }
 
   // Default constructor.
   CompressedVector() = default;
+
+  // Move constructor.
+  CompressedVector(CompressedVector&& other) noexcept
+      : data(std::move(other.data)), num_elements(other.num_elements) {
+    other.num_elements = 0;
+  }
+
+  // Move assignment operator.
+  CompressedVector& operator=(CompressedVector&& other) noexcept {
+    if (this != &other) {
+      data = std::move(other.data);
+      num_elements = other.num_elements;
+      other.num_elements = 0;
+    }
+    return *this;
+  }
+
+  // Copy constructor
+  CompressedVector(const CompressedVector& other)
+      : data(other.data), num_elements(other.num_elements) {}
+
+  // Copy assignment operator
+  CompressedVector& operator=(const CompressedVector& other) {
+    if (this != &other) {
+      data = other.data;
+      num_elements = other.num_elements;
+    }
+    return *this;
+  }
 
   // Adds a new element to the end of the CompressedVector.
   void push_back(std::uint32_t value) {
@@ -51,22 +79,31 @@ class CompressedVector {
   }
 
   // Returns the number of elements in the CompressedVector.
-  std::size_t size() const { return num_elements; }
+  std::size_t size() const noexcept { return num_elements; }
 
   // Returns the total memory usage of the CompressedVector in bytes.
-  std::size_t byteSize() const { return sizeof(*this) + data.capacity(); }
+  std::size_t byteSize() const noexcept { return sizeof(*this) + data.size(); }
 
   // Clears all elements from the CompressedVector.
-  void clear() {
+  void clear() noexcept {
     data.clear();
     num_elements = 0;
   }
 
   // Checks if the CompressedVector is empty.
-  bool empty() const { return num_elements == 0; }
+  bool empty() const noexcept { return num_elements == 0; }
 
   // Reserves storage for at least the specified number of bytes.
   void reserve(std::size_t new_cap) { data.reserve(new_cap); }
+
+  // Swaps the contents of two CompressedVector objects.
+  void swap(CompressedVector& other) noexcept {
+    std::swap(data, other.data);
+    std::swap(num_elements, other.num_elements);
+  }
+
+  // Returns a pointer to the underlying data.
+  const std::uint8_t* raw_data() const noexcept { return data.data(); }
 
   // Iterator class for sequential access to the elements in the
   // CompressedVector.
@@ -92,7 +129,7 @@ class CompressedVector {
         byte = *ptr++;
         result |= static_cast<std::uint32_t>(byte & 0x7F) << shift;
         shift += 7;
-      } while ((byte & 0x80) && ptr < end);
+      } while ((byte & 0x80));
 
       current = result;
     }
@@ -123,8 +160,6 @@ class CompressedVector {
 
     // Equality operator.
     bool operator==(const Iterator& other) const {
-      // Two iterators are equal if they are both at the end or point to the
-      // same location in the data.
       return is_end == other.is_end && ptr == other.ptr;
     }
 
@@ -135,12 +170,17 @@ class CompressedVector {
   };
 
   // Returns an iterator to the beginning of the CompressedVector.
-  Iterator begin() const {
+  Iterator begin() const noexcept {
     return Iterator(data.data(), data.data() + data.size());
   }
 
   // Returns an iterator to the end of the CompressedVector.
-  Iterator end() const {
+  Iterator end() const noexcept {
     return Iterator(data.data() + data.size(), data.data() + data.size());
   }
 };
+
+// Swaps two CompressedVector objects.
+void swap(CompressedVector& lhs, CompressedVector& rhs) noexcept {
+  lhs.swap(rhs);
+}

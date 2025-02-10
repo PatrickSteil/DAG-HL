@@ -211,6 +211,29 @@ struct CompressedLabel {
   std::size_t byteSize() const { return sizeof(*this) + nodes.byteSize(); }
 };
 
+struct DeltaCompressedLabel {
+  CompressedVector nodes;
+
+  DeltaCompressedLabel(){};
+  DeltaCompressedLabel(const CompressedLabel &other) : nodes(other.nodes) {}
+  DeltaCompressedLabel(DeltaCompressedLabel &&other) noexcept
+      : nodes(std::move(other.nodes)) {}
+
+  DeltaCompressedLabel(const Label &other) : nodes() {
+    auto it = other.nodes.begin();
+    nodes.push_back(*it);
+
+    auto prevValue = *it;
+    for (; it != other.nodes.end(); ++it) {
+      nodes.push_back((*it) - prevValue - 1);
+    }
+  }
+
+  std::size_t size() const { return nodes.size(); };
+
+  std::size_t byteSize() const { return sizeof(*this) + nodes.byteSize(); }
+};
+
 struct SimpleCompressedLabel {
   std::vector<std::uint8_t> nodes_small;
   std::vector<std::uint32_t> nodes_large;

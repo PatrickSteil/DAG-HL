@@ -17,6 +17,7 @@ int main(int argc, char *argv[]) {
 
   std::size_t mem_raw_bytes = 0;
   std::size_t mem_compressed_bytes = 0;
+  std::size_t mem_delta_compressed_bytes = 0;
   std::size_t mem_simple_compressed_bytes = 0;
 
   std::array<std::vector<Label>, 2> labels;
@@ -46,6 +47,23 @@ int main(int argc, char *argv[]) {
     }
   }
   {
+    std::array<std::vector<DeltaCompressedLabel>, 2> comp_labels;
+
+    comp_labels[FWD].reserve(labels[FWD].size());
+    comp_labels[BWD].reserve(labels[BWD].size());
+
+    for (std::size_t v = 0; v < labels[FWD].size(); ++v) {
+      comp_labels[FWD].emplace_back(labels[FWD][v]);
+      comp_labels[BWD].emplace_back(labels[BWD][v]);
+    }
+
+    for (std::size_t v = 0; v < comp_labels[FWD].size(); ++v) {
+      mem_delta_compressed_bytes += comp_labels[FWD][v].byteSize();
+      mem_delta_compressed_bytes += comp_labels[BWD][v].byteSize();
+    }
+  }
+
+  {
     std::array<std::vector<SimpleCompressedLabel>, 2> comp_labels;
 
     comp_labels[FWD].reserve(labels[FWD].size());
@@ -66,6 +84,8 @@ int main(int argc, char *argv[]) {
             << std::endl;
   std::cout << "Compressed:         " << (mem_compressed_bytes / (1024 * 1024))
             << std::endl;
+  std::cout << "Delta Compressed:   "
+            << (mem_delta_compressed_bytes / (1024 * 1024)) << std::endl;
   std::cout << "Simple Compressed:  "
             << (mem_simple_compressed_bytes / (1024 * 1024)) << std::endl;
 

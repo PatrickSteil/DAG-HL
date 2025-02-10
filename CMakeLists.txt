@@ -81,6 +81,11 @@ if(benchmark_FOUND)
     if(OpenMP_CXX_FOUND)
         target_link_libraries(edgetree_bench PUBLIC OpenMP::OpenMP_CXX)
     endif()
+
+    add_executable(compress_vector_bench benchmark/compress_vector_bench.cpp)
+    target_include_directories(compress_vector_bench PUBLIC datastructures benchmark)
+    target_link_libraries(compress_vector_bench PRIVATE benchmark::benchmark benchmark::benchmark_main ips4o)
+
 else()
     message(STATUS "Google Benchmark not found, skipping benchmarks")
 endif()
