@@ -25,6 +25,7 @@
 #include <vector>
 
 #include "compressed_vector.h"
+#include "graph.h"
 #include "ips4o.hpp"
 #include "spinlock.h"
 #include "status_log.h"
@@ -272,6 +273,8 @@ void saveToFile(std::array<std::vector<LABEL>, 2> &labels,
 
   std::size_t N = labels[FWD].size();
 
+  outFile << "V " << N << "\n";
+
   for (std::size_t v = 0; v < N; ++v) {
     outFile << "o " << v;
     for (const Vertex hub : labels[FWD][v].nodes) {
@@ -307,6 +310,19 @@ void readFromFile(std::array<std::vector<LABEL>, 2> &labels,
   std::string line;
   std::size_t vertexIndex = 0;
 
+  std::getline(inFile, line);
+  if (line.substr(0, 2) == "V ") {
+    std::istringstream iss(line.substr(2));
+    std::size_t numNodes;
+    iss >> numNodes;
+
+    labels[FWD].resize(numNodes);
+    labels[BWD].resize(numNodes);
+  } else {
+    std::cerr << "Error: First line format invalid, expected 'V {num nodes}'\n";
+    return;
+  }
+
   while (std::getline(inFile, line)) {
     if (line.empty()) {
       continue;
@@ -322,29 +338,24 @@ void readFromFile(std::array<std::vector<LABEL>, 2> &labels,
     std::vector<Vertex> hubs;
     std::istringstream iss(line.substr(1));
     Vertex hub;
+
+    // first element is the vertex itself
+    iss >> vertexIndex;
+    assert(vertexIndex < labels[FWD].size());
+    assert(vertexIndex < labels[BWD].size());
+
     while (iss >> hub) {
       hubs.push_back(hub);
-    }
-
-    while (labels[FWD].size() <= vertexIndex) {
-      labels[FWD].emplace_back();
-      labels[BWD].emplace_back();
     }
 
     if (labelType == 'o') {
       labels[FWD][vertexIndex].nodes = std::move(hubs);
     } else if (labelType == 'i') {
       labels[BWD][vertexIndex].nodes = std::move(hubs);
-      ++vertexIndex;
     }
   }
 
   inFile.close();
-  if (inFile.fail()) {
-    std::cerr << "Error: Reading from file " << fileName << " failed.\n";
-  } else {
-    std::cout << "Labels loaded successfully from " << fileName << "\n";
-  }
 }
 
 template <class LABEL = Label>

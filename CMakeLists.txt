@@ -37,6 +37,11 @@ add_executable(PLL pll.cpp)
 target_include_directories(PLL PUBLIC datastructures)
 target_link_libraries(PLL PRIVATE ips4o)
 
+# Build Labels vs CompressedLabel
+add_executable(LabelVSCompLabel benchmark/label_vs_compressed_label.cpp)
+target_include_directories(LabelVSCompLabel PUBLIC datastructures)
+target_link_libraries(LabelVSCompLabel PRIVATE ips4o)
+
 # Enable testing
 enable_testing()
 find_package(GTest)
@@ -58,7 +63,6 @@ if(GTest_FOUND)
 else()
     message(STATUS "GoogleTest not found, skipping unit tests")
 endif()
-
 
 find_package(benchmark)
 
