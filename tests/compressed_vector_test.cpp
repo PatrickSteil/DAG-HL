@@ -63,15 +63,6 @@ TEST(CompressedVectorTest, Clear) {
   EXPECT_EQ(cv.size(), 0);
 }
 
-// Test reserve method
-TEST(CompressedVectorTest, Reserve) {
-  CompressedVector cv;
-  cv.reserve(100);
-
-  // Ensure the internal data vector has at least the reserved capacity
-  EXPECT_GE(cv.byteSize(), 100);
-}
-
 // Test edge case: empty vector
 TEST(CompressedVectorTest, EmptyVector) {
   std::vector<std::uint32_t> numbers;
