@@ -21,10 +21,10 @@ def load_and_process_data(file_path):
 def plot_benchmark_results(df, benchmarks, benchmark_colors):
     plt.figure(figsize=(10, 6))
 
-    # Define markers for the two benchmark types
     markers = {
         "BM_Intersect_Vector": "o",
-        "BM_Intersect_CompressedVector": "X"
+        "BM_Intersect_CompressedVector": "X",
+        "BM_Intersect_DeltaCompressedVector": "."
     }
 
     for benchmark in benchmarks:
@@ -44,27 +44,23 @@ def plot_benchmark_results(df, benchmarks, benchmark_colors):
     plt.xscale("log")
     plt.yscale("log")
     plt.legend()
-    plt.title("Benchmark: Vector vs CompressedVector Intersection")
+    plt.title("Benchmark: Vector vs CompressedVector vs DeltaCompressedVector Intersection")
     plt.grid(True, which="both", linestyle="--", linewidth=0.5)
 
 # Main execution
 if __name__ == "__main__":
-    # Load data from the CSV file
     df = load_and_process_data("benchmark_compress_vector.csv")
 
-    # Define benchmarks for plotting
-    benchmarks = ["BM_Intersect_Vector", "BM_Intersect_CompressedVector"]
+    benchmarks = ["BM_Intersect_Vector", "BM_Intersect_CompressedVector", "BM_Intersect_DeltaCompressedVector"]
 
-    # Define colors for benchmarks
     benchmark_colors = {
         "BM_Intersect_Vector": "tab:blue",
-        "BM_Intersect_CompressedVector": "tab:red"
+        "BM_Intersect_CompressedVector": "tab:red",
+        "BM_Intersect_DeltaCompressedVector": "tab:green"
     }
 
-    # Plot the benchmark results
     plot_benchmark_results(df, benchmarks, benchmark_colors)
 
-    # Save the plot as PDF
     plt.savefig("benchmark_intersect_plot.pdf", format="pdf", bbox_inches="tight")
     plt.show()
 

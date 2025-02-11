@@ -186,3 +186,44 @@ bool intersect(Iterator A_begin, Iterator A_end, Iterator B_begin,
 
   return false;
 }
+
+template <typename Iterator>
+bool intersect_delta(Iterator A_begin, Iterator A_end, Iterator B_begin,
+                     Iterator B_end) {
+  if (A_begin == A_end || B_begin == B_end) return false;
+
+  // Decode first elements
+  auto val_A = *A_begin;
+  auto val_B = *B_begin;
+
+  ++A_begin;
+  ++B_begin;
+
+  while (A_begin != A_end && B_begin != B_end) {
+    if (val_A == val_B) return true;
+
+    if (val_A < val_B) {
+      val_A += *A_begin + 1;
+      ++A_begin;
+    } else {
+      val_B += *B_begin + 1;
+      ++B_begin;
+    }
+  }
+
+  // Process remaining elements in A
+  while (A_begin != A_end) {
+    val_A += *A_begin + 1;
+    if (val_A == val_B) return true;
+    ++A_begin;
+  }
+
+  // Process remaining elements in B
+  while (B_begin != B_end) {
+    val_B += *B_begin + 1;
+    if (val_A == val_B) return true;
+    ++B_begin;
+  }
+
+  return val_A == val_B;
+}

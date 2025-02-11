@@ -226,6 +226,7 @@ struct DeltaCompressedLabel {
     auto prevValue = *it;
     for (; it != other.nodes.end(); ++it) {
       nodes.push_back((*it) - prevValue - 1);
+      prevValue = *it;
     }
   }
 

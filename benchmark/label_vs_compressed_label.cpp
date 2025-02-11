@@ -94,79 +94,84 @@ int main(int argc, char *argv[]) {
 
 /*
 # this is without -c (compress)
-./LabelVSCompLabel -i ../data/icice.labels
+>>> ./LabelVSCompLabel -i ../data/icice.labels
 Forward Labels Statistics:
   Min Size:     1
   Max Size:     222
-  Avg Size:     64.8244
+  Avg Size:     64.827
 Backward Labels Statistics:
   Min Size:     1
   Max Size:     133
-  Avg Size:     42.7774
-FWD # count:    12061749
-BWD # count:    7959504
-Both # count:   20021253
+  Avg Size:     42.7677
+FWD # count:    12062224
+BWD # count:    7957702
+Both # count:   20019926
 Total memory consumption [megabytes]:
-  117.453
+  117.435
 Memory [mb]:
 Raw:                117
 Compressed:         78
+Delta Compressed:   56
 Simple Compressed:  125
 
-./LabelVSCompLabel -i ../data/kvv.labels
+>>> ./LabelVSCompLabel -i ../data/kvv.labels
 Forward Labels Statistics:
   Min Size:     1
   Max Size:     240
-  Avg Size:     78.5587
+  Avg Size:     78.559
 Backward Labels Statistics:
   Min Size:     1
   Max Size:     227
-  Avg Size:     69.6286
-FWD # count:    198548559
-BWD # count:    175978560
-Both # count:   374527119
+  Avg Size:     69.6258
+FWD # count:    198549287
+BWD # count:    175971501
+Both # count:   374520788
 Total memory consumption [megabytes]:
-  2149.56
+  2149.54
 Memory [mb]:
 Raw:                2149
 Compressed:         1431
+Delta Compressed:   999
 Simple Compressed:  2265
 
 # this is with -c (compress)
+>>> ./LabelVSCompLabel -i ../data/icice.labels
 Forward Labels Statistics:
   Min Size:     1
   Max Size:     222
-  Avg Size:     64.8377
+  Avg Size:     64.8339
 Backward Labels Statistics:
   Min Size:     1
   Max Size:     133
-  Avg Size:     42.776
-FWD # count:    12064218
-BWD # count:    7959240
-Both # count:   20023458
+  Avg Size:     42.7785
+FWD # count:    12063512
+BWD # count:    7959709
+Both # count:   20023221
 Total memory consumption [megabytes]:
-  117.455
+  117.445
 Memory [mb]:
 Raw:                117
 Compressed:         58
+Delta Compressed:   49
 Simple Compressed:  103
 
-./LabelVSCompLabel -i ../data/kvv.labels
+>>> ./LabelVSCompLabel -i ../data/kvv.labels
 Forward Labels Statistics:
   Min Size:     1
   Max Size:     240
-  Avg Size:     78.5586
+  Avg Size:     78.5597
 Backward Labels Statistics:
   Min Size:     1
   Max Size:     227
-  Avg Size:     69.6287
-FWD # count:    198548139
-BWD # count:    175978837
-Both # count:   374526976
+  Avg Size:     69.6284
+FWD # count:    198550988
+BWD # count:    175978093
+Both # count:   374529081
 Total memory consumption [megabytes]:
-  2149.57
+  2149.59
 Memory [mb]:
 Raw:                2149
 Compressed:         1130
+Delta Compressed:   950
 Simple Compressed:  2089
 */
