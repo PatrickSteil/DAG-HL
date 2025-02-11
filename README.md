@@ -32,6 +32,7 @@ To build and run the release version:
 
 ```bash
 cd build-release
+cmake -DCMAKE_BUILD_TYPE=Release ..
 make
 ./DAGHL -h
 ```
@@ -44,18 +45,19 @@ The output file contains hub labels for all vertices in the graph. Each vertex h
 -   **`i` line** – incoming hubs (backward labels).
 
 ### File Structure
-1.  **Outgoing Hubs (`o` line)**
+1.  First line contains `V ` followed by the number of vertices.
+3.  **Outgoing Hubs (`o` line)**
     -   Starts with `o`.
     -   Followed by the vertex ID.
     -   Followed by hubs reachable in the forward direction.
     -   Example: `o 0 1 3` → Vertex `0` has outgoing hubs `1` and `3`.
-2.  **Incoming Hubs (`i` line)**
+4.  **Incoming Hubs (`i` line)**
     -   Starts with `i`.
     -   Followed by the vertex ID.
     -   Followed by hubs reachable in the backward direction.
     -   Example: `i 0 2 4` → Vertex `0` has incoming hubs `2` and `4`.
-3.  Each vertex contributes **exactly two lines** to the file (`o` and `i`).
-4.  The total number of lines is `2 × number of vertices`.
+5.  Each vertex contributes **exactly two lines** to the file (`o` and `i`).
+6.  The total number of lines is `2 × number of vertices + 1`.
 
 ### Example Output
 For a graph with the following labels:
@@ -64,6 +66,7 @@ For a graph with the following labels:
 
 The output file:
 ```
+V 5
 o 0 1 3
 i 0 2 4
 o 1 2
