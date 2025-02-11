@@ -39,6 +39,34 @@ static void BM_Intersect_Vector(benchmark::State& state) {
   }
 }
 
+static void BM_Intersect_DeltaVector(benchmark::State& state) {
+  std::size_t N = state.range(0);
+  std::vector<std::uint32_t> numbers = generateEvenNumbers(N);
+  std::vector<std::uint32_t> query = generateOddNumbers(N);
+
+  std::vector<std::uint32_t> delta_compressed;
+  delta_compressed.reserve(N * 5);
+  delta_compressed.push_back(numbers.front());
+  for (std::size_t i = 1; i < numbers.size(); ++i) {
+    delta_compressed.push_back(numbers[i] - numbers[i - 1] - 1);
+  }
+
+  std::vector<std::uint32_t> delta_query;
+  delta_query.reserve(N * 5);
+  delta_query.push_back(query.front());
+  for (std::size_t i = 1; i < query.size(); ++i) {
+    delta_query.push_back(query[i] - query[i - 1] - 1);
+  }
+
+  for (auto _ : state) {
+    bool result =
+        intersect_delta(delta_compressed.begin(), delta_compressed.end(),
+                        delta_query.begin(), delta_query.end());
+    assert(result);
+    benchmark::DoNotOptimize(result);
+  }
+}
+
 static void BM_Intersect_CompressedVector(benchmark::State& state) {
   std::size_t N = state.range(0);
   std::vector<std::uint32_t> numbers = generateEvenNumbers(N);
@@ -84,6 +112,7 @@ static void BM_Intersect_DeltaCompressedVector(benchmark::State& state) {
 }
 
 BENCHMARK(BM_Intersect_Vector)->Range(1 << 10, 1 << 20);
+BENCHMARK(BM_Intersect_DeltaVector)->Range(1 << 10, 1 << 20);
 BENCHMARK(BM_Intersect_CompressedVector)->Range(1 << 10, 1 << 20);
 BENCHMARK(BM_Intersect_DeltaCompressedVector)->Range(1 << 10, 1 << 20);
 

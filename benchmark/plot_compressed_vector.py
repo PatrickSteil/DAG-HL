@@ -44,17 +44,18 @@ def plot_benchmark_results(df, benchmarks, benchmark_colors):
     plt.xscale("log")
     plt.yscale("log")
     plt.legend()
-    plt.title("Benchmark: Vector vs CompressedVector vs DeltaCompressedVector Intersection")
+    plt.title("Benchmark: Vector vs DeltaVector vs CompressedVector vs DeltaCompressedVector Intersection")
     plt.grid(True, which="both", linestyle="--", linewidth=0.5)
 
 # Main execution
 if __name__ == "__main__":
     df = load_and_process_data("benchmark_compress_vector.csv")
 
-    benchmarks = ["BM_Intersect_Vector", "BM_Intersect_CompressedVector", "BM_Intersect_DeltaCompressedVector"]
+    benchmarks = ["BM_Intersect_Vector", "BM_Intersect_DeltaVector", "BM_Intersect_CompressedVector", "BM_Intersect_DeltaCompressedVector"]
 
     benchmark_colors = {
         "BM_Intersect_Vector": "tab:blue",
+        "BM_Intersect_DeltaVector": "tab:orange",
         "BM_Intersect_CompressedVector": "tab:red",
         "BM_Intersect_DeltaCompressedVector": "tab:green"
     }
