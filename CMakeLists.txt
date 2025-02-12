@@ -48,8 +48,10 @@ find_package(GTest)
 
 if(GTest_FOUND)
     add_executable(unit_test 
+        tests/bit_vector_test.cpp 
         tests/bfs_tools_test.cpp 
         tests/drawer_test.cpp 
+        tests/golomb_rice_test.cpp 
         tests/compressed_vector_test.cpp
         tests/forest_test.cpp 
         tests/graph_test.cpp 
