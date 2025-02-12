@@ -6,28 +6,60 @@
 #pragma once
 
 #include <cassert>
-#include <concepts>
 #include <cstdint>
 #include <fstream>
-#include <iterator>
+#include <iostream>
 #include <vector>
 
 template <typename T>
 concept UnsignedIntegral = std::is_unsigned_v<T>;
 
+/**
+ * @class BitVector
+ * @brief A compact container for storing and manipulating bits efficiently.
+ *
+ * This class uses a vector of unsigned integers (e.g., uint64_t) to store bits.
+ * It provides methods to push bits, access bits, and serialize/deserialize the
+ * bit vector.
+ *
+ * @tparam TYPE The unsigned integer type used to store bits (default:
+ * uint64_t).
+ */
 template <UnsignedIntegral TYPE = uint64_t>
 class BitVector {
  private:
-  std::vector<TYPE> data;
-  size_t size_ = 0;
+  std::vector<TYPE>
+      data;          ///< Underlying storage for bits, stored in chunks of TYPE.
+  size_t size_ = 0;  ///< Total number of bits stored in the BitVector.
 
-  static constexpr size_t BITS_PER_WORD = sizeof(TYPE) * 8;
+  static constexpr size_t BITS_PER_WORD =
+      sizeof(TYPE) * 8;  ///< Number of bits per TYPE.
+
+  /**
+   * @brief Calculates the index of the word (in `data`) that contains the
+   * specified bit.
+   * @param bit The index of the bit.
+   * @return The index of the word in `data`.
+   */
   static size_t word_index(size_t bit) { return bit / BITS_PER_WORD; }
+
+  /**
+   * @brief Calculates the position of the bit within its word.
+   * @param bit The index of the bit.
+   * @return The bit's position within its word (0 to BITS_PER_WORD - 1).
+   */
   static size_t bit_index(size_t bit) { return bit % BITS_PER_WORD; }
 
  public:
+  /**
+   * @brief Default constructor.
+   */
   BitVector() = default;
 
+  /**
+   * @brief Constructs a BitVector from a vector of bools.
+   * @param bits A vector of bools to initialize the BitVector.
+   */
   explicit BitVector(const std::vector<bool>& bits) {
     reserve(bits.size());
     for (bool bit : bits) {
@@ -35,60 +67,76 @@ class BitVector {
     }
   }
 
-  BitVector(const BitVector& other) : data(other.data), size_(other.size_) {}
+  BitVector(const BitVector& other) = default;
+  BitVector& operator=(const BitVector& other) = default;
+  BitVector(BitVector&& other) noexcept = default;
+  BitVector& operator=(BitVector&& other) noexcept = default;
 
-  BitVector& operator=(const BitVector& other) {
-    if (this != &other) {
-      data = other.data;
-      size_ = other.size_;
-    }
-    return *this;
-  }
-
-  BitVector(BitVector&& other) noexcept
-      : data(std::move(other.data)), size_(other.size_) {
-    other.size_ = 0;
-  }
-
-  BitVector& operator=(BitVector&& other) noexcept {
-    if (this != &other) {
-      data = std::move(other.data);
-      size_ = other.size_;
-      other.size_ = 0;
-    }
-    return *this;
-  }
-
+  /**
+   * @brief Adds a bit to the end of the BitVector.
+   * @param value The bit value to add (true = 1, false = 0).
+   */
   void push_back(bool value) {
     if (size_ % BITS_PER_WORD == 0) {
-      data.push_back(0);
+      data.emplace_back(0);  // Add a new word if the current one is full.
     }
-    data[word_index(size_)] |= (TYPE(value) << bit_index(size_));
+    data[word_index(size_)] |=
+        (TYPE(value) << bit_index(size_));  // Set the bit.
     ++size_;
   }
 
+  /**
+   * @brief Accesses a bit at a specific index.
+   * @param index The index of the bit to access.
+   * @return The value of the bit at the specified index.
+   * @throws std::out_of_range if the index is out of bounds.
+   */
   bool operator[](size_t index) const {
     assert(index < size_);
     return (data[word_index(index)] >> bit_index(index)) & 1;
   }
 
+  /**
+   * @brief Clears the BitVector, removing all bits.
+   */
   void clear() {
     data.clear();
     size_ = 0;
   }
 
+  /**
+   * @brief Reserves space for a specified number of bits.
+   * @param bits The number of bits to reserve space for.
+   */
   void reserve(size_t bits) {
     data.reserve((bits + BITS_PER_WORD - 1) / BITS_PER_WORD);
   }
 
+  /**
+   * @brief Returns the number of bits stored in the BitVector.
+   * @return The size of the BitVector in bits.
+   */
   size_t size() const { return size_; }
 
+  /**
+   * @brief Returns the total capacity of the BitVector in bits.
+   * @return The capacity of the BitVector in bits.
+   */
   size_t capacity() const { return data.capacity() * BITS_PER_WORD; }
 
+  /**
+   * @brief Calculates the total memory usage of the BitVector in bytes.
+   * @return The size of the BitVector in bytes, including overhead.
+   */
   size_t byteSize() const {
-    return sizeof(BitVector) + (data.capacity() * sizeof(TYPE));
+    return sizeof(BitVector) + (data.size() * sizeof(TYPE));
   }
 
+  /**
+   * @brief Serializes the BitVector to a binary file.
+   * @param filename The name of the file to write to.
+   * @return True if the serialization was successful, false otherwise.
+   */
   bool serialize(const std::string& filename) const {
     std::ofstream file(filename, std::ios::binary);
     if (!file) return false;
@@ -102,6 +150,11 @@ class BitVector {
     return file.good();
   }
 
+  /**
+   * @brief Deserializes the BitVector from a binary file.
+   * @param filename The name of the file to read from.
+   * @return True if the deserialization was successful, false otherwise.
+   */
   bool deserialize(const std::string& filename) {
     std::ifstream file(filename, std::ios::binary);
     if (!file) return false;
@@ -116,10 +169,14 @@ class BitVector {
     return file.good();
   }
 
+  /**
+   * @class Iterator
+   * @brief A forward iterator for traversing the bits in the BitVector.
+   */
   class Iterator {
    private:
-    const BitVector* bv;
-    size_t index;
+    const BitVector* bv;  ///< Pointer to the BitVector being iterated.
+    size_t index;         ///< Current bit index.
 
    public:
     using iterator_category = std::forward_iterator_tag;
@@ -128,24 +185,64 @@ class BitVector {
     using pointer = void;
     using reference = bool;
 
+    /**
+     * @brief Constructs an Iterator for a BitVector.
+     * @param bv The BitVector to iterate over.
+     * @param index The starting bit index.
+     */
     Iterator(const BitVector* bv, size_t index) : bv(bv), index(index) {}
 
+    /**
+     * @brief Dereferences the iterator to access the current bit.
+     * @return The value of the current bit.
+     */
     bool operator*() const { return (*bv)[index]; }
+
+    /**
+     * @brief Advances the iterator to the next bit.
+     * @return A reference to the updated iterator.
+     */
     Iterator& operator++() {
       ++index;
       return *this;
     }
+
+    /**
+     * @brief Advances the iterator to the next bit (post-increment).
+     * @return A copy of the iterator before advancement.
+     */
     Iterator operator++(int) {
       Iterator temp = *this;
       ++(*this);
       return temp;
     }
+
+    /**
+     * @brief Compares two iterators for equality.
+     * @param other The iterator to compare with.
+     * @return True if the iterators point to the same bit, false otherwise.
+     */
     bool operator==(const Iterator& other) const {
       return index == other.index;
     }
+
+    /**
+     * @brief Compares two iterators for inequality.
+     * @param other The iterator to compare with.
+     * @return True if the iterators point to different bits, false otherwise.
+     */
     bool operator!=(const Iterator& other) const { return !(*this == other); }
   };
 
+  /**
+   * @brief Returns an iterator to the first bit in the BitVector.
+   * @return An iterator pointing to the first bit.
+   */
   Iterator begin() const { return Iterator(this, 0); }
+
+  /**
+   * @brief Returns an iterator to one past the last bit in the BitVector.
+   * @return An iterator pointing to one past the last bit.
+   */
   Iterator end() const { return Iterator(this, size_); }
 };

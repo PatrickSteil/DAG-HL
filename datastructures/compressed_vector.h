@@ -13,10 +13,8 @@
 
 /*
  * CompressedVector is a space-efficient data structure that stores a sequence
- * of non-negative integers using LEB128 encoding, reducing storage by only
- * using as many bytes as needed per number. It provides an iterator for
- * sequential access, decoding numbers on-the-fly while keeping track of the
- * total number of elements and memory usage.
+ * of non-negative integers using LEB128 encoding. It optimizes memory usage by
+ * encoding only as many bytes as needed per number.
  * https://en.wikipedia.org/wiki/LEB128
  */
 class CompressedVector {
@@ -24,25 +22,23 @@ class CompressedVector {
   std::vector<std::uint8_t> data;
   std::size_t num_elements = 0;
 
-  // Encodes a 32-bit unsigned integer using LEB128 encoding and appends it to
-  // the output vector.
+  // Encodes a 32-bit unsigned integer using LEB128 encoding.
   static void encodeLEB128(std::uint32_t value,
                            std::vector<std::uint8_t>& out) {
-    while (value >= 0x80) {
-      out.push_back(static_cast<std::uint8_t>((value & 0x7F) | 0x80));
+    do {
+      out.push_back(static_cast<std::uint8_t>((value & 0x7F) |
+                                              (value >= 0x80 ? 0x80 : 0)));
       value >>= 7;
-    }
-    out.push_back(static_cast<std::uint8_t>(value));
+    } while (value);
   }
 
  public:
   // Constructs a CompressedVector from an existing vector of 32-bit unsigned
   // integers.
   explicit CompressedVector(const std::vector<std::uint32_t>& numbers) {
-    reserve(numbers.size() * 5);  // Reserve space more accurately
-    for (std::uint32_t num : numbers) {
-      push_back(num);
-    }
+    data.reserve(numbers.size() *
+                 5);  // Preallocate assuming max LEB128 encoding size.
+    for (std::uint32_t num : numbers) push_back(num);
   }
 
   // Default constructor.
@@ -77,41 +73,40 @@ class CompressedVector {
     return *this;
   }
 
-  // Adds a new element to the end of the CompressedVector.
+  // Adds a new element to the CompressedVector.
   void push_back(std::uint32_t value) {
     encodeLEB128(value, data);
     ++num_elements;
   }
 
-  // Returns the number of elements in the CompressedVector.
+  // Returns the number of stored elements.
   std::size_t size() const noexcept { return num_elements; }
 
-  // Returns the total memory usage of the CompressedVector in bytes.
+  // Returns total memory usage (including object overhead).
   std::size_t byteSize() const noexcept { return sizeof(*this) + data.size(); }
 
-  // Clears all elements from the CompressedVector.
+  // Clears all elements.
   void clear() noexcept {
     data.clear();
     num_elements = 0;
   }
 
-  // Checks if the CompressedVector is empty.
+  // Checks if the vector is empty.
   bool empty() const noexcept { return num_elements == 0; }
 
-  // Reserves storage for at least the specified number of bytes.
+  // Reserves storage space.
   void reserve(std::size_t new_cap) { data.reserve(new_cap); }
 
-  // Swaps the contents of two CompressedVector objects.
+  // Swaps content with another CompressedVector.
   void swap(CompressedVector& other) noexcept {
-    std::swap(data, other.data);
+    data.swap(other.data);
     std::swap(num_elements, other.num_elements);
   }
 
-  // Returns a pointer to the underlying data.
+  // Returns a pointer to the underlying raw data.
   const std::uint8_t* raw_data() const noexcept { return data.data(); }
 
-  // Iterator class for sequential access to the elements in the
-  // CompressedVector.
+  // Iterator for sequential access to elements.
   class Iterator {
    private:
     const std::uint8_t* ptr;
@@ -119,8 +114,8 @@ class CompressedVector {
     std::uint32_t current;
     bool is_end;
 
-    // Decodes the next LEB128-encoded value from the data.
-    void decodeNext() {
+    // Decodes the next LEB128-encoded value.
+    constexpr void decodeNext() {
       if (ptr >= end) {
         is_end = true;
         return;
@@ -128,14 +123,12 @@ class CompressedVector {
 
       std::uint32_t result = 0;
       std::uint8_t shift = 0;
-      std::uint8_t byte;
-
-      do {
-        byte = *ptr++;
-        result |= static_cast<std::uint32_t>(byte & 0x7F) << shift;
+      while (ptr < end) {
+        std::uint8_t byte = *ptr++;
+        result |= (byte & 0x7F) << shift;
         shift += 7;
-      } while ((byte & 0x80));
-
+        if (!(byte & 0x80)) break;
+      }
       current = result;
     }
 
@@ -146,7 +139,7 @@ class CompressedVector {
     using pointer = const std::uint32_t*;
     using reference = const std::uint32_t&;
 
-    // Constructs an Iterator pointing to the start of the data.
+    // Constructs an iterator.
     explicit Iterator(const std::uint8_t* start, const std::uint8_t* stop)
         : ptr(start), end(stop), current(0), is_end(false) {
       decodeNext();
@@ -157,9 +150,7 @@ class CompressedVector {
 
     // Prefix increment operator.
     Iterator& operator++() {
-      if (!is_end) {
-        decodeNext();
-      }
+      if (!is_end) decodeNext();
       return *this;
     }
 
@@ -169,23 +160,21 @@ class CompressedVector {
     }
 
     // Inequality operator.
-    bool operator!=(const Iterator& other) const {
-      return is_end != other.is_end || ptr != other.ptr;
-    }
+    bool operator!=(const Iterator& other) const { return !(*this == other); }
   };
 
-  // Returns an iterator to the beginning of the CompressedVector.
+  // Returns an iterator to the first element.
   Iterator begin() const noexcept {
     return Iterator(data.data(), data.data() + data.size());
   }
 
-  // Returns an iterator to the end of the CompressedVector.
+  // Returns an iterator to the end.
   Iterator end() const noexcept {
     return Iterator(data.data() + data.size(), data.data() + data.size());
   }
 };
 
 // Swaps two CompressedVector objects.
-void swap(CompressedVector& lhs, CompressedVector& rhs) noexcept {
+inline void swap(CompressedVector& lhs, CompressedVector& rhs) noexcept {
   lhs.swap(rhs);
 }
