@@ -282,38 +282,22 @@ bool query(std::array<std::vector<LABEL>, 2> &labels, const Vertex from,
                    toLabels.nodes.begin(), toLabels.nodes.end());
 }
 
-// TODO test this method
-bool queryDeltaRepresentation(std::array<std::vector<Label>, 2> &labels,
-                              const Vertex from, const Vertex to) {
+template <class LABEL = Label>
+bool query_delta(std::array<std::vector<Label>, 2> &labels, const Vertex from,
+                 const Vertex to) {
+  assert(from < labels[FWD].size());
+  assert(from < labels[BWD].size());
+  assert(to < labels[FWD].size());
+  assert(to < labels[BWD].size());
+
   if (from == to) [[unlikely]]
     return true;
 
   const auto &fromLabels = labels[FWD][from];
   const auto &toLabels = labels[BWD][to];
 
-  if (fromLabels.size() == 0 || toLabels.size() == 0) [[unlikely]] {
-    return false;
-  }
-
-  Vertex fromHub = fromLabels[0];
-  Vertex toHub = toLabels[0];
-
-  std::size_t i = 0;
-  std::size_t j = 0;
-
-  while (i < fromLabels.size() && j < toLabels.size()) {
-    if (fromHub == toHub) {
-      return true;
-    }
-
-    if (fromHub < toHub) {
-      fromHub += 1 + fromLabels[++i];
-    } else {
-      toHub += 1 + toLabels[++j];
-    }
-  }
-
-  return false;
+  return intersect_delta(fromLabels.nodes.begin(), fromLabels.nodes.end(),
+                         toLabels.nodes.begin(), toLabels.nodes.end());
 }
 
 template <class LABEL = Label>

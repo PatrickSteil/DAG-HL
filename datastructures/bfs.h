@@ -21,14 +21,17 @@ namespace bfs {
 
 auto noOp = [](const Vertex /* v */) { return false; };
 
+// Breadth-First Search (BFS) structure for traversing a graph.
 struct BFS {
   const Graph &graph;
   FixedSizedQueue<Vertex> q;
   GenerationChecker<> seen;
 
+  // Constructor initializes BFS with the given graph.
   BFS(const Graph &graph)
       : graph(graph), q(graph.numVertices()), seen(graph.numVertices()) {}
 
+  // Resets the BFS state and resizes the queue and seen marker.
   void reset(const std::size_t numVertices) {
     q.reset();
     q.resize(numVertices);
@@ -36,6 +39,7 @@ struct BFS {
     seen.resize(numVertices);
   }
 
+  // Applies a function to all vertices currently in the queue.
   template <typename FUNC>
   void doForAllVerticesInQ(FUNC &&func) {
     for (std::size_t i = 0; i < q.read; ++i) {
@@ -44,7 +48,8 @@ struct BFS {
     }
   }
 
-  // make sure you do thread safe stuff in the function
+  // Applies a function to all vertices in the queue in parallel.
+  // Ensure thread safety inside the provided function.
   template <typename FUNC>
   void doForAllVerticesInQInParallel(FUNC &&func) {
 #pragma omp parallel for schedule(dynamic, 32)
@@ -54,6 +59,9 @@ struct BFS {
     }
   }
 
+  // Runs BFS from a given root vertex.
+  // Uses optional callbacks for processing vertices on pop and edge
+  // relaxations.
   template <typename ON_POP = decltype([](const Vertex) { return false; }),
             typename ON_RELAX = decltype([](const Vertex, const Vertex) {
               return false;
