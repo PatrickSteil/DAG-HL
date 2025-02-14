@@ -28,12 +28,10 @@ concept UnsignedIntegral = std::is_unsigned_v<T>;
 template <UnsignedIntegral TYPE = uint64_t>
 class BitVector {
  private:
-  std::vector<TYPE>
-      data;          ///< Underlying storage for bits, stored in chunks of TYPE.
-  size_t size_ = 0;  ///< Total number of bits stored in the BitVector.
+  std::vector<TYPE> data;
+  size_t size_ = 0;
 
-  static constexpr size_t BITS_PER_WORD =
-      sizeof(TYPE) * 8;  ///< Number of bits per TYPE.
+  static constexpr size_t BITS_PER_WORD = sizeof(TYPE) * 8;
 
   /**
    * @brief Calculates the index of the word (in `data`) that contains the
@@ -78,10 +76,9 @@ class BitVector {
    */
   void push_back(bool value) {
     if (size_ % BITS_PER_WORD == 0) {
-      data.emplace_back(0);  // Add a new word if the current one is full.
+      data.emplace_back(0);
     }
-    data[word_index(size_)] |=
-        (TYPE(value) << bit_index(size_));  // Set the bit.
+    data[word_index(size_)] |= (TYPE(value) << bit_index(size_));
     ++size_;
   }
 
@@ -102,6 +99,56 @@ class BitVector {
   void clear() {
     data.clear();
     size_ = 0;
+  }
+
+  /**
+   * @brief Bitwise And
+   */
+  BitVector& operator&=(const BitVector& other) {
+    assert(size_ == other.size_);
+
+    for (size_t i = 0; i < data.size(); ++i) {
+      data[i] &= other.data[i];
+    }
+
+    return *this;
+  }
+
+  /**
+   * @brief Bitwise Or
+   */
+  BitVector& operator|=(const BitVector& other) {
+    assert(size_ == other.size_);
+
+    for (size_t i = 0; i < data.size(); ++i) {
+      data[i] |= other.data[i];
+    }
+
+    return *this;
+  }
+
+  /**
+   * @brief Bitwise XOr
+   */
+  BitVector& operator^=(const BitVector& other) {
+    assert(size_ == other.size_);
+
+    for (size_t i = 0; i < data.size(); ++i) {
+      data[i] ^= other.data[i];
+    }
+
+    return *this;
+  }
+
+  /**
+   * @brief Bitwise flip
+   */
+  BitVector& operator~() {
+    for (size_t i = 0; i < data.size(); ++i) {
+      data[i] = ~data[i];
+    }
+
+    return *this;
   }
 
   /**
@@ -175,8 +222,8 @@ class BitVector {
    */
   class Iterator {
    private:
-    const BitVector* bv;  ///< Pointer to the BitVector being iterated.
-    size_t index;         ///< Current bit index.
+    const BitVector* bv;
+    size_t index;
 
    public:
     using iterator_category = std::forward_iterator_tag;

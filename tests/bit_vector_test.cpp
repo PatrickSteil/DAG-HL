@@ -120,3 +120,78 @@ TEST(BitVectorTest, SerializeDeserialize) {
 
   std::filesystem::remove(filename);
 }
+
+TEST(BitVectorTest, BitwiseANDAssignment) {
+  BitVector<> bv1;
+  BitVector<> bv2;
+
+  bv1.push_back(1);
+  bv1.push_back(0);
+  bv1.push_back(1);
+
+  bv2.push_back(1);
+  bv2.push_back(1);
+  bv2.push_back(0);
+
+  bv1 &= bv2;
+
+  EXPECT_EQ(bv1.size(), 3);
+  EXPECT_EQ(bv1[0], true);   // 1 & 1 = 1
+  EXPECT_EQ(bv1[1], false);  // 0 & 1 = 0
+  EXPECT_EQ(bv1[2], false);  // 1 & 0 = 0
+}
+
+TEST(BitVectorTest, BitwiseORAssignment) {
+  BitVector<> bv1;
+  BitVector<> bv2;
+
+  bv1.push_back(1);
+  bv1.push_back(0);
+  bv1.push_back(1);
+
+  bv2.push_back(1);
+  bv2.push_back(1);
+  bv2.push_back(0);
+
+  bv1 |= bv2;
+
+  EXPECT_EQ(bv1.size(), 3);
+  EXPECT_EQ(bv1[0], true);  // 1 | 1 = 1
+  EXPECT_EQ(bv1[1], true);  // 0 | 1 = 1
+  EXPECT_EQ(bv1[2], true);  // 1 | 0 = 1
+}
+
+TEST(BitVectorTest, BitwiseXORAssignment) {
+  BitVector<> bv1;
+  BitVector<> bv2;
+
+  bv1.push_back(1);
+  bv1.push_back(0);
+  bv1.push_back(1);
+
+  bv2.push_back(1);
+  bv2.push_back(1);
+  bv2.push_back(0);
+
+  bv1 ^= bv2;
+
+  EXPECT_EQ(bv1.size(), 3);
+  EXPECT_EQ(bv1[0], false);  // 1 ^ 1 = 0
+  EXPECT_EQ(bv1[1], true);   // 0 ^ 1 = 1
+  EXPECT_EQ(bv1[2], true);   // 1 ^ 0 = 1
+}
+
+TEST(BitVectorTest, BitwiseNOTAssignment) {
+  BitVector<> bv;
+
+  bv.push_back(1);
+  bv.push_back(0);
+  bv.push_back(1);
+
+  ~bv;
+
+  EXPECT_EQ(bv.size(), 3);
+  EXPECT_EQ(bv[0], false);  // ~1 = 0
+  EXPECT_EQ(bv[1], true);   // ~0 = 1
+  EXPECT_EQ(bv[2], false);  // ~1 = 0
+}
