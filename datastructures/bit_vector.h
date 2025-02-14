@@ -246,3 +246,16 @@ class BitVector {
    */
   Iterator end() const { return Iterator(this, size_); }
 };
+
+// Some benchmark results compared to vector<bool>
+/*
+---------------------------------------------------------------------
+Benchmark                           Time             CPU   Iterations
+---------------------------------------------------------------------
+BM_VectorBool_RandomAccess       5.82 ns         5.82 ns    119532178
+BM_BitVector_RandomAccess        5.33 ns         5.33 ns    131385561
+BM_VectorBool_Iteration       1013484 ns      1013472 ns          691
+BM_BitVector_Iteration         605940 ns       605924 ns         1153
+BM_VectorBool_PushBack        1733511 ns      1733499 ns          405
+BM_BitVector_PushBack         1534437 ns      1534386 ns          455
+*/
