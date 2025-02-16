@@ -64,58 +64,42 @@ class FixedSizedQueueThreadSafe {
   explicit FixedSizedQueueThreadSafe(std::size_t size = 0)
       : data(size), read(0), write(0) {}
 
+  // Resize the queue safely (not thread-safe in this version)
   void resize(std::size_t size) {
-    std::lock(mutex_read, mutex_write);
-
-    std::lock_guard<std::mutex> lock_read(mutex_read, std::adopt_lock);
-    std::lock_guard<std::mutex> lock_write(mutex_write, std::adopt_lock);
-
     data.resize(size);
-    read = 0;
-    write = 0;
+    read.store(0, std::memory_order_relaxed);
+    write.store(0, std::memory_order_relaxed);
   }
 
   void push(VertexType v) {
-    std::lock_guard<std::mutex> lock(mutex_write);
-    assert(write < data.size());
-    data[write++] = v;
+    auto index = write.fetch_add(1, std::memory_order_relaxed);
+    assert(index < data.size());  // Ensure no overflows
+    data[index] = v;
   }
 
   VertexType pop() {
-    std::lock(mutex_read, mutex_write);
-    std::lock_guard<std::mutex> lock_read(mutex_read, std::adopt_lock);
-    std::lock_guard<std::mutex> lock_write(mutex_write, std::adopt_lock);
-
-    if (read == write) [[unlikely]] {
-      return static_cast<VertexType>(-1);
+    auto current_read = read.load(std::memory_order_relaxed);
+    if (current_read >= write.load(std::memory_order_acquire)) {
+      return static_cast<VertexType>(-1);  // Queue empty
     }
-    /* assert(read < write); */
-    return data[read++];
+    auto index = read.fetch_add(1, std::memory_order_relaxed);
+    assert(index < data.size());  // Ensure valid access
+    return data[index];
   }
 
   bool isEmpty() const {
-    std::lock(mutex_read, mutex_write);
-    std::lock_guard<std::mutex> lock_read(mutex_read, std::adopt_lock);
-    std::lock_guard<std::mutex> lock_write(mutex_write, std::adopt_lock);
-
-    return read == write;
+    return read.load(std::memory_order_acquire) ==
+           write.load(std::memory_order_acquire);
   }
 
   void reset() {
-    std::lock(mutex_read, mutex_write);
-    std::lock_guard<std::mutex> lock_read(mutex_read, std::adopt_lock);
-    std::lock_guard<std::mutex> lock_write(mutex_write, std::adopt_lock);
-
-    read = 0;
-    write = 0;
+    read.store(0, std::memory_order_relaxed);
+    write.store(0, std::memory_order_relaxed);
   }
 
- private:
-  mutable std::mutex mutex_read;
-  mutable std::mutex mutex_write;
   std::vector<VertexType> data;
-  std::size_t read;
-  std::size_t write;
+  std::atomic_size_t read;
+  std::atomic_size_t write;
 };
 
 template <typename VertexType = std::uint64_t>
@@ -350,6 +334,13 @@ class GenerationCheckerThreadSafe {
     assert(isValid(i));
     seen[i].store(generation.load(std::memory_order_acquire),
                   std::memory_order_release);
+  }
+
+  // Returns true if this vertex has not been seen yet, and marks it
+  bool firstOccur(std::size_t i) {
+    bool seenBefore = (seen[i].load(std::memory_order_acquire) == generation);
+    seen[i].store(generation, std::memory_order_release);
+    return !seenBefore;
   }
 
  private:

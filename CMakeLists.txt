@@ -77,6 +77,14 @@ if(benchmark_FOUND)
         target_link_libraries(queue_bench PUBLIC OpenMP::OpenMP_CXX)
     endif()
 
+    add_executable(parr_bfs_bench benchmark/parr_bfs_bench.cpp)
+    target_include_directories(parr_bfs_bench PUBLIC datastructures benchmark)
+    target_link_libraries(parr_bfs_bench PRIVATE benchmark::benchmark benchmark::benchmark_main ips4o)
+
+    if(OpenMP_CXX_FOUND)
+        target_link_libraries(parr_bfs_bench PUBLIC OpenMP::OpenMP_CXX)
+    endif()
+
     add_executable(edgetree_bench benchmark/edgetree_bench.cpp)
     target_include_directories(edgetree_bench PUBLIC datastructures benchmark)
     target_link_libraries(edgetree_bench PRIVATE benchmark::benchmark benchmark::benchmark_main ips4o)

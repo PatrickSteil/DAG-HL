@@ -13,6 +13,8 @@
 
 #include <omp.h>
 
+#include <optional>
+
 #include "../external/statistics_collecter.h"
 #include "bfs_tools.h"
 #include "graph.h"
@@ -105,7 +107,9 @@ struct BFSParallelFrontier {
         q(graph.numVertices()),
         local_cache(numThreads),
         read(0),
-        write(0) {}
+        write(0) {
+    omp_set_num_threads(numThreads);
+  }
 
   void reset(const std::size_t numVertices) {
     q.resize(numVertices);
@@ -114,6 +118,7 @@ struct BFSParallelFrontier {
 
     seen.reset();
     seen.resize(numVertices);
+    local_cache.assign(local_cache.size(), {});
   }
 
   void addToQueue(const Vertex v) { q[read.fetch_add(1)] = v; }
@@ -149,7 +154,7 @@ struct BFSParallelFrontier {
     assert(left <= right);
     assert(right <= q.size());
 
-    constexpr std::size_t CHUNK_SIZE = 32;  // Experiment with this value
+    constexpr std::size_t CHUNK_SIZE = 32;
 #pragma omp parallel
     {
       int tId = omp_get_thread_num();
@@ -197,6 +202,142 @@ struct BFSParallelFrontier {
   std::vector<std::vector<Vertex>> local_cache;
   std::atomic_size_t read;
   std::atomic_size_t write;
+};
+
+struct ParallelBFS {
+  const Graph &graph;
+  FixedSizedQueueThreadSafe<Vertex> q;
+  GenerationCheckerThreadSafe<> seen;
+  const int numThreads;
+
+  ParallelBFS(const Graph &graph, const int numThreads)
+      : graph(graph),
+        q(graph.numVertices()),
+        seen(graph.numVertices()),
+        numThreads(numThreads) {}
+
+  void reset(const std::size_t numVertices) {
+    q.reset();
+    q.resize(numVertices);
+    seen.reset();
+    seen.resize(numVertices);
+  }
+
+  template <typename ON_POP = decltype([](const Vertex) { return false; }),
+            typename ON_RELAX = decltype([](const Vertex) { return false; })>
+  void run(const Vertex root, ON_POP &&onPop = noOp,
+           ON_RELAX &&onRelax = noOp) {
+    q.reset();
+    seen.reset();
+
+    q.push(root);
+    seen.mark(root);
+
+    alignas(64) std::atomic_size_t threads_working_{
+        static_cast<std::size_t>(numThreads)};
+    alignas(64) std::atomic_size_t threads_stealing_{0};
+
+    // Function to process nodes.
+    auto processNode = [&](Vertex u) {
+      if (onPop(u)) return;
+
+      for (std::size_t i = graph.beginEdge(u); i < graph.endEdge(u); ++i) {
+        const Vertex w = graph.toVertex[i];
+
+        if (!seen.firstOccur(w)) continue;
+
+        if (onRelax(u, w)) continue;
+
+        q.push(w);
+      }
+    };
+
+    // Function to find work either from the thread's local queue or through
+    // stealing.
+    const auto findWork = [&](auto &&findWork,
+                              std::size_t thread_id) -> std::optional<Vertex> {
+      // Try to find work locally.
+      Vertex u = q.pop();
+      if (u != noVertex) {
+        return u;
+      }
+
+      // Wait for others to run out of work.
+      for (auto currently_working =
+               threads_working_.fetch_sub(1, std::memory_order_relaxed) - 1;
+           currently_working > 0; currently_working = threads_working_.load(
+                                      std::memory_order_relaxed)) {
+        u = q.pop();
+        if (u != noVertex) {
+          threads_working_.fetch_add(1, std::memory_order_relaxed);
+          return u;
+        }
+      }
+
+      // Do a final check for work.
+      u = q.pop();
+      if (u != noVertex) {
+        threads_working_.fetch_add(1, std::memory_order_relaxed);
+        return u;
+      }
+
+      // Mark as done if no work is left.
+      if (threads_stealing_.fetch_sub(1, std::memory_order_relaxed) == 1) {
+        return std::nullopt;
+      }
+
+      // Wait for other threads to finish their work or find more tasks.
+      for (;;) {
+        if (threads_working_.load(std::memory_order_relaxed) > 0) {
+          // Someone else found work.
+          threads_stealing_.fetch_add(1, std::memory_order_relaxed);
+          threads_working_.fetch_add(1, std::memory_order_relaxed);
+          return findWork(findWork, thread_id);
+        } else if (threads_stealing_.load(std::memory_order_relaxed) == 0) {
+          // No one else is working.
+          return std::nullopt;
+        }
+      }
+    };
+
+    std::atomic_size_t thread_id(0);
+
+    // Worker function for each thread.
+    const auto work = [&]() {
+      const auto my_id = thread_id.fetch_add(1, std::memory_order_relaxed);
+      for (;;) {
+        if (auto u = findWork(findWork, my_id)) {
+          processNode(*u);  // Process the node if found.
+        } else {
+          break;  // No work found, break the loop.
+        }
+      }
+    };
+
+    std::vector<std::thread> threads;
+    for (std::size_t i = 0; i < static_cast<std::size_t>(numThreads); ++i) {
+      threads.emplace_back(work);
+    }
+
+    for (auto &t : threads) {
+      t.join();
+    }
+  }
+
+  template <typename FUNC>
+  void doForAllVerticesInQ(FUNC &&func) {
+    // after the queue is done, read is +1 compared to write
+    auto index = q.read.load();
+
+    index = std::min(index, q.write.load());
+
+    assert(index < q.data.size());
+
+    for (std::size_t i = 0; i < index; ++i) {
+      const Vertex u = q.data[i];
+      func(u);
+    }
+  }
 };
 
 };  // namespace bfs
