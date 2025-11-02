@@ -5,6 +5,22 @@ Author: Patrick Steil
 
 This repository implements a hub labeling algorithm for reachability queries on directed acyclic graphs (DAGs). It does **not** compute or store shortest path distances.
 
+## Citation
+
+I wrote a small paper describing the new parallelism approach, see [ArXiv](https://arxiv.org/abs/2507.21204v1). Please cite my work when using the code:
+
+```bash
+@misc{steil2025parallelplldags,
+      title={Parallel PLL on DAGs}, 
+      author={Patrick Steil},
+      year={2025},
+      eprint={2507.21204},
+      archivePrefix={arXiv},
+      primaryClass={cs.DS},
+      url={https://arxiv.org/abs/2507.21204}, 
+}
+```
+
 ## Build Instructions
 
 To build the project, run the provided `build.sh` script:
