@@ -227,3 +227,36 @@ bool intersect_delta(Iterator A_begin, Iterator A_end, Iterator B_begin,
 
   return val_A == val_B;
 }
+
+inline uint8_t min_u8(uint8_t a, uint8_t b) {
+  uint32_t A = a;
+  uint32_t B = b;
+  uint32_t R;
+
+  asm volatile(
+      "movl  %1, %0\n\t"    // R = A   (32-bit)
+      "cmpb  %b2, %b1\n\t"  // compare low 8 bits of A, B
+      "cmovae %2, %0\n\t"   // if A >= B (unsigned), R = B   => min
+      : "=&r"(R)
+      : "r"(A), "r"(B)
+      : "cc");
+
+  return (uint8_t)R;
+}
+
+template <typename It1, typename It2>
+struct zip_iterator {
+  It1 it1;
+  It2 it2;
+
+  auto operator*() const { return std::tie(*it1, *it2); }
+  auto &operator++() {
+    ++it1;
+    ++it2;
+    return *this;
+  }
+
+  friend bool operator!=(zip_iterator const &a, zip_iterator const &b) {
+    return a.it1 != b.it1;
+  }
+};

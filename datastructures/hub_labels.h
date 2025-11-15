@@ -11,8 +11,6 @@
 #define PREFETCH(addr)
 #endif
 
-#include <omp.h>
-
 #include <algorithm>
 #include <array>
 #include <chrono>
@@ -20,260 +18,68 @@
 #include <iostream>
 #include <numeric>
 #include <queue>
+#include <ranges>
 #include <set>
 #include <sstream>
 #include <vector>
 
-#include "compressed_vector.h"
 #include "graph.h"
-#include "ips4o.hpp"
-#include "spinlock.h"
-#include "status_log.h"
 #include "types.h"
 #include "utils.h"
 
+struct HubEntry {
+  Vertex node;
+  Weight dist;
+};
+
 struct Label {
+  std::vector<HubEntry> hubs;
   Label(){};
 
-  Label(const Label &other) : nodes(other.nodes) {}
+  Label(const Label &other) : hubs(other.hubs) {}
 
-  Label(Label &&other) noexcept : nodes(std::move(other.nodes)) {}
+  Label(Label &&other) noexcept : hubs(std::move(other.hubs)) {}
 
   Label &operator=(const Label &other) {
     if (this != &other) {
-      nodes = other.nodes;
+      hubs = other.hubs;
     }
     return *this;
   }
 
   Label &operator=(Label &&other) noexcept {
     if (this != &other) {
-      nodes = std::move(other.nodes);
+      hubs = std::move(other.hubs);
     }
     return *this;
   }
 
-  std::vector<Vertex> nodes;
+  void reserve(const std::size_t size) { hubs.reserve(size); };
 
-  Vertex &operator[](std::size_t i) { return nodes[i]; }
-  const Vertex &operator[](std::size_t i) const { return nodes[i]; }
+  std::size_t size() const { return hubs.size(); };
 
-  template <typename FUNC>
-  void doForAll(FUNC &&apply) {
-    for (std::size_t i = 0; i < nodes.size(); ++i) {
-      auto &h = nodes[i];
-      apply(h);
-    }
-  }
-
-  // toVerfiy should take (const Vertex h) as argument
-  template <typename FUNC>
-  bool appliesToAny(FUNC &&toVerfiy) const {
-    return std::any_of(nodes.begin(), nodes.end(), toVerfiy);
-  }
-
-  bool prune(const std::vector<std::uint8_t> &lookup) {
-    for (std::size_t i = 0; i < nodes.size(); ++i) {
-      if (i + 4 < nodes.size()) {
-        PREFETCH(&lookup[nodes[i + 4]]);
-      }
-
-      if (lookup[nodes[i]]) {
-        return true;
-      }
-    }
-
-    return false;
-  }
-
-  void reserve(const std::size_t size) { nodes.reserve(size); };
-
-  std::size_t size() const { return nodes.size(); };
-
-  void add(const Vertex hub) { nodes.push_back(hub); };
-
-  bool contains(const Vertex hub) {
-    return std::find(nodes.begin(), nodes.end(), hub) != nodes.end();
+  void add(const Vertex hub, const Weight dist) {
+    hubs.emplace_back(hub, dist);
   };
-
-  void applyPermutation(const std::vector<Vertex> &permutation) {
-    for (auto &hub : nodes) {
-      hub = permutation[hub];
-    }
-
-    std::sort(nodes.begin(), nodes.end());
-  }
-
-  void sort() { std::sort(nodes.begin(), nodes.end()); }
-
-  void setDeltaRepresentation() {
-    if (nodes.empty()) return;
-
-    std::vector<Vertex> new_nodes;
-    new_nodes.reserve(nodes.size());
-
-    new_nodes.push_back(nodes.front());
-
-    auto prevHub = nodes.front();
-    for (std::size_t i = 1; i < nodes.size(); ++i) {
-      new_nodes.push_back(nodes[i] - prevHub - 1);
-      prevHub = nodes[i];
-    }
-
-    nodes = std::move(new_nodes);
-  }
-};
-
-struct LabelThreadSafe : Label {
-  mutable Spinlock mutex;
-
-  LabelThreadSafe() {}
-
-  LabelThreadSafe(const LabelThreadSafe &other) : Label(other) {}
-
-  LabelThreadSafe(LabelThreadSafe &&other) noexcept : Label(std::move(other)) {}
-
-  LabelThreadSafe &operator=(const LabelThreadSafe &other) {
-    if (this != &other) {
-      std::lock_guard<Spinlock> lock(mutex);
-      Label::operator=(other);
-    }
-    return *this;
-  }
-
-  LabelThreadSafe &operator=(LabelThreadSafe &&other) noexcept {
-    if (this != &other) {
-      std::lock_guard<Spinlock> lock(mutex);
-      Label::operator=(std::move(other));
-    }
-    return *this;
-  }
-
-  void add(const Vertex hub) {
-    std::lock_guard<Spinlock> lock(mutex);
-    nodes.push_back(hub);
-  };
-
-  bool contains(const Vertex hub) {
-    std::lock_guard<Spinlock> lock(mutex);
-    return std::find(nodes.begin(), nodes.end(), hub) != nodes.end();
-  };
-
-  template <typename FUNC>
-  void doForAll(FUNC &&apply) {
-    std::lock_guard<Spinlock> lock(mutex);
-    for (std::size_t i = 0; i < nodes.size(); ++i) {
-      auto &h = nodes[i];
-      apply(h);
-    }
-  }
-
-  template <typename FUNC>
-  bool appliesToAny(FUNC &&toVerfiy) const {
-    std::lock_guard<Spinlock> lock(mutex);
-    return std::any_of(nodes.begin(), nodes.end(), toVerfiy);
-  }
-
-  bool prune(const std::vector<std::uint8_t> &lookup) {
-    std::lock_guard<Spinlock> lock(mutex);
-    for (std::size_t i = 0; i < nodes.size(); ++i) {
-      if (i + 4 < nodes.size()) {
-        PREFETCH(&lookup[nodes[i + 4]]);
-      }
-
-      if (lookup[nodes[i]]) {
-        return true;
-      }
-    }
-
-    return false;
-  }
 
   void sort() {
-    std::lock_guard<Spinlock> lock(mutex);
-    std::sort(nodes.begin(), nodes.end());
-  }
-  // all other methods will likely not be called in parallel
+    std::sort(
+        hubs.begin(), hubs.end(),
+        [](const HubEntry &a, const HubEntry &b) { return a.node < b.node; });
+  };
 };
 
-struct CompressedLabel {
-  CompressedVector nodes;
-
-  CompressedLabel(){};
-  CompressedLabel(const CompressedLabel &other) : nodes(other.nodes) {}
-  CompressedLabel(CompressedLabel &&other) noexcept
-      : nodes(std::move(other.nodes)) {}
-
-  CompressedLabel(const Label &other) : nodes(other.nodes) {}
-
-  std::size_t size() const { return nodes.size(); };
-
-  std::size_t byteSize() const { return sizeof(*this) + nodes.byteSize(); }
-};
-
-struct DeltaCompressedLabel {
-  CompressedVector nodes;
-
-  DeltaCompressedLabel(){};
-  DeltaCompressedLabel(const CompressedLabel &other) : nodes(other.nodes) {}
-  DeltaCompressedLabel(DeltaCompressedLabel &&other) noexcept
-      : nodes(std::move(other.nodes)) {}
-
-  DeltaCompressedLabel(const Label &other) : nodes() {
-    auto it = other.nodes.begin();
-    nodes.push_back(*it);
-
-    auto prevValue = *it;
-    for (; it != other.nodes.end(); ++it) {
-      nodes.push_back((*it) - prevValue - 1);
-      prevValue = *it;
-    }
-  }
-
-  std::size_t size() const { return nodes.size(); };
-
-  std::size_t byteSize() const { return sizeof(*this) + nodes.byteSize(); }
-};
-
-struct SimpleCompressedLabel {
-  std::vector<std::uint8_t> nodes_small;
-  std::vector<std::uint32_t> nodes_large;
-
-  SimpleCompressedLabel(){};
-  SimpleCompressedLabel(const SimpleCompressedLabel &other)
-      : nodes_small(other.nodes_small), nodes_large(other.nodes_large) {}
-  SimpleCompressedLabel(SimpleCompressedLabel &&other) noexcept
-      : nodes_small(std::move(other.nodes_small)),
-        nodes_large(std::move(other.nodes_large)) {}
-
-  SimpleCompressedLabel(const Label &other) : nodes_small(), nodes_large() {
-    for (auto v : other.nodes) {
-      if (v < 256) {
-        nodes_small.push_back(v);
-      } else {
-        nodes_large.push_back(v);
-      }
-    }
-  }
-
-  std::size_t size() const { return nodes_small.size() + nodes_large.size(); }
-
-  std::size_t byteSize() const {
-    return sizeof(*this) + nodes_small.capacity() * sizeof(std::uint8_t) +
-           nodes_large.capacity() * sizeof(std::uint32_t);
-  }
-};
-
-bool query(std::array<std::vector<Label>, 2> &labels, const Vertex from,
-           const Vertex to) {
+Weight query(std::array<std::vector<Label>, 2> &labels, const Vertex from,
+             const Vertex to) {
   assert(from < labels[FWD].size());
   assert(from < labels[BWD].size());
   assert(to < labels[FWD].size());
   assert(to < labels[BWD].size());
 
   if (from == to) [[unlikely]]
-    return true;
+    return 0;
 
+  Weight result = noWeight;
   const auto &fromLabels = labels[FWD][from];
   const auto &toLabels = labels[BWD][to];
 
@@ -284,163 +90,16 @@ bool query(std::array<std::vector<Label>, 2> &labels, const Vertex from,
   const std::size_t BSize = toLabels.size();
 
   while (i < ASize && j < BSize) {
-    if (fromLabels[i] == toLabels[j]) return true;
+    if (fromLabels.hubs[i].node == toLabels.hubs[j].node)
+      result = min_u8(fromLabels.hubs[i].dist + toLabels.hubs[i].dist, result);
 
-    if (fromLabels[i] < toLabels[j])
+    if (fromLabels.hubs[i].node < toLabels.hubs[j].node)
       ++i;
     else
       ++j;
   }
 
-  return false;
-}
-
-bool query(std::array<std::vector<LabelThreadSafe>, 2> &labels,
-           const Vertex from, const Vertex to) {
-  assert(from < labels[FWD].size());
-  assert(from < labels[BWD].size());
-  assert(to < labels[FWD].size());
-  assert(to < labels[BWD].size());
-
-  if (from == to) [[unlikely]]
-    return true;
-
-  const auto &fromLabels = labels[FWD][from];
-  const auto &toLabels = labels[BWD][to];
-
-  std::scoped_lock lck{fromLabels.mutex, toLabels.mutex};
-
-  std::size_t i = 0;
-  std::size_t j = 0;
-
-  const std::size_t ASize = fromLabels.size();
-  const std::size_t BSize = toLabels.size();
-
-  while (i < ASize && j < BSize) {
-    if (fromLabels[i] == toLabels[j]) return true;
-
-    if (fromLabels[i] < toLabels[j])
-      ++i;
-    else
-      ++j;
-  }
-
-  return false;
-}
-
-template <class LABEL = Label>
-bool query_delta(std::array<std::vector<Label>, 2> &labels, const Vertex from,
-                 const Vertex to) {
-  assert(from < labels[FWD].size());
-  assert(from < labels[BWD].size());
-  assert(to < labels[FWD].size());
-  assert(to < labels[BWD].size());
-
-  if (from == to) [[unlikely]]
-    return true;
-
-  const auto &fromLabels = labels[FWD][from];
-  const auto &toLabels = labels[BWD][to];
-
-  return intersect_delta(fromLabels.nodes.begin(), fromLabels.nodes.end(),
-                         toLabels.nodes.begin(), toLabels.nodes.end());
-}
-
-template <class LABEL = Label>
-void saveToFile(std::array<std::vector<LABEL>, 2> &labels,
-                const std::string &fileName) {
-  std::ofstream outFile(fileName);
-
-  if (!outFile.is_open()) {
-    std::cerr << "Error: Unable to open file " << fileName << " for writing.\n";
-    return;
-  }
-
-  std::size_t N = labels[FWD].size();
-
-  outFile << "V " << N << "\n";
-
-  for (std::size_t v = 0; v < N; ++v) {
-    outFile << "o " << v;
-    for (const Vertex hub : labels[FWD][v].nodes) {
-      outFile << " " << hub;
-    }
-    outFile << "\n";
-
-    outFile << "i " << v;
-    for (const Vertex hub : labels[BWD][v].nodes) {
-      outFile << " " << hub;
-    }
-    outFile << "\n";
-  }
-
-  outFile.close();
-  if (outFile.fail()) {
-    std::cerr << "Error: Writing to file " << fileName << " failed.\n";
-  } else {
-    std::cout << "Labels saved successfully to " << fileName << "\n";
-  }
-}
-
-template <class LABEL = Label>
-void readFromFile(std::array<std::vector<LABEL>, 2> &labels,
-                  const std::string &fileName) {
-  std::ifstream inFile(fileName);
-
-  if (!inFile.is_open()) {
-    std::cerr << "Error: Unable to open file " << fileName << " for reading.\n";
-    return;
-  }
-
-  std::string line;
-  std::size_t vertexIndex = 0;
-
-  std::getline(inFile, line);
-  if (line.substr(0, 2) == "V ") {
-    std::istringstream iss(line.substr(2));
-    std::size_t numNodes;
-    iss >> numNodes;
-
-    labels[FWD].resize(numNodes);
-    labels[BWD].resize(numNodes);
-  } else {
-    std::cerr << "Error: First line format invalid, expected 'V {num nodes}'\n";
-    return;
-  }
-
-  while (std::getline(inFile, line)) {
-    if (line.empty()) {
-      continue;
-    }
-
-    char labelType = line[0];
-
-    if (labelType != 'o' && labelType != 'i') {
-      std::cerr << "Error: Unexpected line format: " << line << "\n";
-      continue;
-    }
-
-    std::vector<Vertex> hubs;
-    std::istringstream iss(line.substr(1));
-    Vertex hub;
-
-    // first element is the vertex itself
-    iss >> vertexIndex;
-    assert(vertexIndex < labels[FWD].size());
-    assert(vertexIndex < labels[BWD].size());
-
-    while (iss >> hub) {
-      hubs.push_back(hub);
-    }
-
-    if (labelType == 'o') {
-      labels[FWD][vertexIndex].nodes = std::move(hubs);
-    } else if (labelType == 'i') {
-      labels[BWD][vertexIndex].nodes = std::move(hubs);
-    }
-  }
-
-  inFile.close();
+  return result;
 }
 
 template <class LABEL = Label>
@@ -462,8 +121,8 @@ std::vector<Vertex> computePermutation(
   for (DIRECTION dir : {FWD, BWD}) {
 #pragma omp for
     for (std::size_t v = 0; v < numVertices; ++v) {
-      for (const auto h : labels[dir][v].nodes) {
-        freq[h].fetch_add(1, std::memory_order_relaxed);
+      for (const auto &h : labels[dir][v].hubs) {
+        freq[h.node].fetch_add(1, std::memory_order_relaxed);
       }
     }
   }
@@ -499,8 +158,7 @@ void sortLabels(std::array<std::vector<LABEL>, 2> &labels) {
   }
 }
 
-template <class LABEL = Label>
-void benchmark_hublabels(std::array<std::vector<LABEL>, 2> &labels,
+void benchmark_hublabels(std::array<std::vector<Label>, 2> &labels,
                          const std::size_t numQueries) {
   using std::chrono::duration;
   using std::chrono::duration_cast;
@@ -514,7 +172,7 @@ void benchmark_hublabels(std::array<std::vector<LABEL>, 2> &labels,
   std::size_t counter = 0;
   auto t1 = high_resolution_clock::now();
   for (const std::pair<Vertex, Vertex> &paar : queries) {
-    counter += query(labels, paar.first, paar.second);
+    counter += (query(labels, paar.first, paar.second) != noWeight);
   }
 
   auto t2 = high_resolution_clock::now();
@@ -524,23 +182,22 @@ void benchmark_hublabels(std::array<std::vector<LABEL>, 2> &labels,
             << (total_ns / numQueries) << " ns/query, counter=" << counter
             << "\n";
 }
-template <typename LABEL = Label>
-std::size_t computeTotalBytes(const std::array<std::vector<LABEL>, 2> &labels) {
+
+std::size_t computeTotalBytes(const std::array<std::vector<Label>, 2> &labels) {
   std::size_t totalBytes = 0;
 
   for (const auto &labelSet : labels) {
     for (const auto &label : labelSet) {
-      totalBytes += sizeof(LABEL);
-      totalBytes += label.nodes.capacity() * sizeof(Vertex);
+      totalBytes += sizeof(Label);
+      totalBytes += label.hubs.capacity() * sizeof(HubEntry);
     }
   }
 
   return totalBytes;
 }
 
-template <typename LABEL = Label>
-void showStats(const std::array<std::vector<LABEL>, 2> &labels) {
-  auto computeStats = [](const std::vector<LABEL> &currentLabels) {
+void showStats(const std::array<std::vector<Label>, 2> &labels) {
+  auto computeStats = [](const std::vector<Label> &currentLabels) {
     std::size_t minSize = std::numeric_limits<std::size_t>::max();
     std::size_t maxSize = 0;
     std::size_t totalSize = 0;
@@ -558,9 +215,6 @@ void showStats(const std::array<std::vector<LABEL>, 2> &labels) {
 
   auto [inMin, inMax, inAvg, inTotal] = computeStats(labels[BWD]);
   auto [outMin, outMax, outAvg, outTotal] = computeStats(labels[FWD]);
-
-  /* std::locale::global(std::locale("")); */
-  /* std::cout.imbue(std::locale()); */
 
   std::cout << "Forward Labels Statistics:" << std::endl;
   std::cout << "  Min Size:     " << outMin << std::endl;

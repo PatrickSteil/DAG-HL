@@ -35,15 +35,19 @@ struct Edge {
 struct Graph {
   std::vector<std::size_t> adjArray;
   std::vector<Vertex> toVertex;
+  std::vector<Weight> weight;
 
-  Graph() : adjArray(1), toVertex(){};
+  Graph() : adjArray(1), toVertex(), weight(){};
 
   Graph(const Graph &other)
-      : adjArray(other.adjArray), toVertex(other.toVertex){};
+      : adjArray(other.adjArray),
+        toVertex(other.toVertex),
+        weight(other.weight){};
 
   Graph(Graph &&other) noexcept
       : adjArray(std::move(other.adjArray)),
-        toVertex(std::move(other.toVertex)) {}
+        toVertex(std::move(other.toVertex)),
+        weight(std::move(other.weight)) {}
 
   bool isValid(const Vertex v) const { return v < numVertices(); }
 
@@ -51,9 +55,6 @@ struct Graph {
   std::size_t numEdges() const { return toVertex.size(); }
 
   void print() const {
-    /* std::locale::global(std::locale("de_DE.UTF-8")); */
-    /* std::cout.imbue(std::locale()); */
-
     std::cout << "NumVertices: " << numVertices() << std::endl;
     std::cout << "NumEdges: " << numEdges() << std::endl;
 
@@ -61,7 +62,7 @@ struct Graph {
       std::cout << "Edges from " << v << std::endl;
 
       for (std::size_t i = beginEdge(v); i < endEdge(v); ++i) {
-        std::cout << toVertex[i] << " ";
+        std::cout << toVertex[i] << " (" << weight[i] << ") ";
       }
       std::cout << std::endl;
     }
@@ -87,10 +88,11 @@ struct Graph {
   void clear() {
     adjArray.clear();
     toVertex.clear();
+    weight.clear();
   }
 
   void readFromEdgeList(const std::string &fileName) {
-    StatusLog log("Reading graph from edgelist");
+    StatusLog log("Reading weighted graph from edgelist");
     clear();
 
     std::ifstream file(fileName);
@@ -98,7 +100,7 @@ struct Graph {
       throw std::runtime_error("Cannot open file: " + fileName);
     }
 
-    std::vector<std::pair<Vertex, Vertex>> edges;
+    std::vector<std::tuple<Vertex, Vertex, Weight>> edges;
     Vertex maxVertex = 0;
 
     std::string line;
@@ -109,7 +111,7 @@ struct Graph {
         continue;
       }
 
-      edges.emplace_back(u - 1, v - 1);
+      edges.emplace_back(u - 1, v - 1, 0);  // Default edge weight is 0
       maxVertex = std::max({maxVertex, u - 1, v - 1});
     }
 
@@ -118,12 +120,8 @@ struct Graph {
     adjArray.resize(maxVertex + 2, 0);
 
     /* std::sort(edges.begin(), edges.end(), */
-    ips4o::parallel::sort(edges.begin(), edges.end(),
-                          [](const auto &left, const auto &right) {
-                            return std::tie(left.first, left.second) <
-                                   std::tie(right.first, right.second);
-                          });
-    for (const auto &[u, v] : edges) {
+    ips4o::parallel::sort(edges.begin(), edges.end());
+    for (const auto &[u, v, w] : edges) {
       ++adjArray[u + 1];
     }
 
@@ -132,10 +130,12 @@ struct Graph {
     }
 
     toVertex.resize(edges.size());
+    weight.resize(edges.size());
     std::vector<std::size_t> offset = adjArray;
 
-    for (const auto &[u, v] : edges) {
-      toVertex[offset[u]++] = v;
+    for (const auto &[u, v, w] : edges) {
+      toVertex[offset[u]] = v;
+      weight[offset[u]++] = w;
     }
   }
 
@@ -149,7 +149,7 @@ struct Graph {
     }
 
     std::string line;
-    std::vector<std::pair<Vertex, Vertex>> edges;
+    std::vector<std::tuple<Vertex, Vertex, Weight>> edges;
     Vertex numVertices = 0, numEdges = 0;
 
     while (std::getline(file, line)) {
@@ -163,26 +163,24 @@ struct Graph {
         if (iss >> tmp >> tmp >> numVertices >> numEdges) {
           parallel_assign(adjArray, numVertices + 1, std::size_t(0));
           parallel_assign(toVertex, numEdges, Vertex(0));
+          parallel_assign(weight, numEdges, Weight(0));
           edges.reserve(numEdges);
         }
       } else if (line[0] == 'a') {
         std::istringstream iss(line);
         char a;
         Vertex u, v;
-        if (iss >> a >> u >> v) {
-          edges.emplace_back(u - 1, v - 1);
+        int w;
+        if (iss >> a >> u >> v >> w) {
+          edges.emplace_back(u - 1, v - 1, Weight(w));
         }
       }
     }
 
     file.close();
-    std::sort(edges.begin(), edges.end(),
-              [](const auto &left, const auto &right) {
-                return std::tie(left.first, left.second) <
-                       std::tie(right.first, right.second);
-              });
+    std::sort(edges.begin(), edges.end());
 
-    for (const auto &[u, v] : edges) {
+    for (const auto &[u, v, w] : edges) {
       ++adjArray[u + 1];
     }
 
@@ -193,138 +191,12 @@ struct Graph {
     adjArray.back() = edges.size();
 
     toVertex.resize(edges.size());
+    weight.resize(edges.size());
     std::vector<std::size_t> offset = adjArray;
 
-    for (const auto &[u, v] : edges) {
-      toVertex[offset[u]++] = v;
-    }
-  }
-
-  void readMetis(const std::string &fileName) {
-    StatusLog log("Reading graph from metis");
-    std::ifstream inputFile(fileName);
-    if (!inputFile.is_open()) {
-      throw std::runtime_error("Failed to open file: " + fileName);
-    }
-
-    clear();
-
-    std::string line;
-
-    if (!std::getline(inputFile, line)) {
-      throw std::runtime_error("Invalid METIS file format: missing header");
-    }
-
-    std::istringstream headerStream(line);
-    std::size_t numVertices, numEdges;
-    if (!(headerStream >> numVertices >> numEdges)) {
-      throw std::runtime_error("Invalid METIS file format: invalid header");
-    }
-
-    adjArray.assign(numVertices + 1, 0);
-    std::vector<std::vector<Vertex>> adjacencyLists(numVertices);
-
-    Vertex vertexId = 0;
-    while (std::getline(inputFile, line)) {
-      if (line.empty()) {
-        continue;
-      }
-
-      std::istringstream lineStream(line);
-      Vertex neighbor;
-      while (lineStream >> neighbor) {
-        if (neighbor < 1 || neighbor > numVertices) {
-          throw std::runtime_error(
-              "Invalid METIS file format: vertex index out of range");
-        }
-        adjacencyLists[vertexId].push_back(neighbor - 1);
-      }
-      ++vertexId;
-    }
-
-    if (vertexId != numVertices) {
-      throw std::runtime_error(
-          "Invalid METIS file format: vertex count mismatch");
-    }
-
-    std::size_t edgeIndex = 0;
-    for (std::size_t v = 0; v < numVertices; ++v) {
-      adjArray[v] = edgeIndex;
-      toVertex.insert(toVertex.end(), adjacencyLists[v].begin(),
-                      adjacencyLists[v].end());
-      edgeIndex += adjacencyLists[v].size();
-    }
-    adjArray[numVertices] = edgeIndex;
-
-    if (toVertex.size() != 2 * numEdges) {
-      throw std::runtime_error(
-          "Invalid METIS file format: edge count mismatch");
-    }
-  }
-
-  void readSnap(const std::string &fileName) {
-    StatusLog log("Reading graph from .snap format");
-    clear();
-
-    std::ifstream file(fileName);
-    if (!file.is_open()) {
-      throw std::runtime_error("Cannot open file: " + fileName);
-    }
-
-    std::vector<std::pair<Vertex, Vertex>> edges;
-    Vertex maxVertex = 0;
-
-    std::string line;
-    while (std::getline(file, line)) {
-      if (line.empty() || line[0] == '#') {
-        continue;
-      }
-
-      std::istringstream iss(line);
-      Vertex u, v;
-      if (!(iss >> u >> v)) {
-        throw std::runtime_error("Invalid line format in .snap file: " + line);
-      }
-
-      u = (u < v ? u : v);
-      v = (u < v ? v : u);
-
-      if (u == v) [[unlikely]]
-        continue;
-
-      edges.emplace_back(u, v);
-      maxVertex = std::max(maxVertex, v);
-    }
-
-    file.close();
-
-    adjArray.resize(maxVertex + 2, 0);
-
-    /* std::sort(edges.begin(), edges.end(), */
-    ips4o::parallel::sort(edges.begin(), edges.end(),
-                          [](const auto &left, const auto &right) {
-                            return std::tie(left.first, left.second) <
-                                   std::tie(right.first, right.second);
-                          });
-
-    auto it = std::unique(edges.begin(), edges.end());
-    edges.erase(it, edges.end());
-
-    for (const auto &[u, v] : edges) {
-      ++adjArray[u + 1];
-    }
-
-    for (std::size_t i = 1; i < adjArray.size(); ++i) {
-      adjArray[i] += adjArray[i - 1];
-    }
-
-    adjArray.back() = edges.size();
-
-    toVertex.resize(edges.size());
-    std::vector<std::size_t> offset = adjArray;
-
-    for (const auto &[u, v] : edges) {
-      toVertex[offset[u]++] = v;
+    for (const auto &[u, v, w] : edges) {
+      toVertex[offset[u]] = v;
+      weight[offset[u]++] = w;
     }
   }
 
@@ -334,6 +206,7 @@ struct Graph {
     Graph reversed;
     reversed.adjArray = adjArray;
     reversed.toVertex = toVertex;
+    reversed.weight = weight;
     reversed.flip();
     return reversed;
   }
@@ -341,6 +214,7 @@ struct Graph {
   void flip() {
     std::vector<std::size_t> flippedAdjArray(numVertices() + 1, 0);
     std::vector<Vertex> flippedToVertex(numEdges(), noVertex);
+    std::vector<Weight> flippedWeight(numEdges(), Weight(0));
 
     for (Vertex fromV(0); fromV < numVertices(); ++fromV) {
       for (std::size_t i = adjArray[fromV]; i < adjArray[fromV + 1]; ++i) {
@@ -357,12 +231,15 @@ struct Graph {
     for (Vertex fromV(0); fromV < numVertices(); ++fromV) {
       for (std::size_t i = adjArray[fromV]; i < adjArray[fromV + 1]; ++i) {
         Vertex toV = toVertex[i];
-        flippedToVertex[offset[toV]++] = fromV;
+        Weight w = weight[i];
+        flippedToVertex[offset[toV]] = fromV;
+        flippedWeight[offset[toV]++] = w;
       }
     }
 
     adjArray = std::move(flippedAdjArray);
     toVertex = std::move(flippedToVertex);
+    weight = std::move(flippedWeight);
   }
 
   void showStats() const {
