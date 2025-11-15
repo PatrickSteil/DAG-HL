@@ -25,9 +25,11 @@
 struct Edge {
   Vertex from;
   Vertex to;
+  Weight weight;
 
   Edge() = default;
-  Edge(Vertex from, Vertex to) : from(from), to(to) {}
+  Edge(Vertex from, Vertex to, Weight weight)
+      : from(from), to(to), weight(weight) {}
 
   auto operator<=>(const Edge &other) const = default;
 };

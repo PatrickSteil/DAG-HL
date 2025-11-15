@@ -239,6 +239,7 @@ void showStats(const std::array<std::vector<Label>, 2> &labels) {
 
 std::vector<Vertex> getOrdering(const std::string &fileName,
                                 const std::array<const Graph *, 2> &graph) {
+  StatusLog log("Load / Compute Ordering");
   std::vector<Vertex> ordering;
   ordering.reserve(graph[FWD]->numVertices());
 

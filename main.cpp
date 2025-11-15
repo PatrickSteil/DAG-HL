@@ -14,6 +14,7 @@
 #include "datastructures/graph.h"
 #include "datastructures/hub_labels.h"
 #include "datastructures/topological_sort.h"
+#include "datastructures/weighted_pll.h"
 #include "external/cmdparser.hpp"
 
 void configure_parser(cli::Parser &parser) {
@@ -54,8 +55,12 @@ int main(int argc, char *argv[]) {
 
   Graph rev = g.reverseGraph();
 
-  /* WeightedPLL hl(g, rev, rank); */
-  /* hl.run(orderingFile); */
+  const int K = 256;
+
+  WeightedPLL<K> hl(g, rev, rank);
+
+  std::vector<Vertex> ordering = getOrdering(orderingFile, hl.graph);
+  hl.run(ordering);
 
   return 0;
 }
