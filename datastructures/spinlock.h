@@ -9,6 +9,12 @@ class Spinlock {
  public:
   Spinlock() : flag_(0) {}
 
+  bool try_lock() {
+    unsigned int expected = 0;
+    return flag_.compare_exchange_strong(expected, 1,
+                                         std::memory_order_acquire);
+  }
+
   void lock() {
     static const timespec ns = {0, 1};
     for (int i = 0; flag_.load(std::memory_order_relaxed) ||

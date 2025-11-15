@@ -54,7 +54,7 @@ int main(int argc, char *argv[]) {
   const auto run_benchmark = parser.get<bool>("b");
 
   // Bitset Width
-  const int K = 128;
+  constexpr int K = 256;
 
   if (numThreads <= 0) {
     std::cout << "Number of threads should be greater than 0!" << std::endl;

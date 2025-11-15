@@ -264,8 +264,7 @@ struct SimpleCompressedLabel {
   }
 };
 
-template <class LABEL = Label>
-bool query(std::array<std::vector<LABEL>, 2> &labels, const Vertex from,
+bool query(std::array<std::vector<Label>, 2> &labels, const Vertex from,
            const Vertex to) {
   assert(from < labels[FWD].size());
   assert(from < labels[BWD].size());
@@ -278,8 +277,55 @@ bool query(std::array<std::vector<LABEL>, 2> &labels, const Vertex from,
   const auto &fromLabels = labels[FWD][from];
   const auto &toLabels = labels[BWD][to];
 
-  return intersect(fromLabels.nodes.begin(), fromLabels.nodes.end(),
-                   toLabels.nodes.begin(), toLabels.nodes.end());
+  std::size_t i = 0;
+  std::size_t j = 0;
+
+  const std::size_t ASize = fromLabels.size();
+  const std::size_t BSize = toLabels.size();
+
+  while (i < ASize && j < BSize) {
+    if (fromLabels[i] == toLabels[j]) return true;
+
+    if (fromLabels[i] < toLabels[j])
+      ++i;
+    else
+      ++j;
+  }
+
+  return false;
+}
+
+bool query(std::array<std::vector<LabelThreadSafe>, 2> &labels,
+           const Vertex from, const Vertex to) {
+  assert(from < labels[FWD].size());
+  assert(from < labels[BWD].size());
+  assert(to < labels[FWD].size());
+  assert(to < labels[BWD].size());
+
+  if (from == to) [[unlikely]]
+    return true;
+
+  const auto &fromLabels = labels[FWD][from];
+  const auto &toLabels = labels[BWD][to];
+
+  std::scoped_lock lck{fromLabels.mutex, toLabels.mutex};
+
+  std::size_t i = 0;
+  std::size_t j = 0;
+
+  const std::size_t ASize = fromLabels.size();
+  const std::size_t BSize = toLabels.size();
+
+  while (i < ASize && j < BSize) {
+    if (fromLabels[i] == toLabels[j]) return true;
+
+    if (fromLabels[i] < toLabels[j])
+      ++i;
+    else
+      ++j;
+  }
+
+  return false;
 }
 
 template <class LABEL = Label>
@@ -465,18 +511,18 @@ void benchmark_hublabels(std::array<std::vector<LABEL>, 2> &labels,
 
   auto queries =
       generateRandomQueries<Vertex>(numQueries, 0, labels[FWD].size());
-  long double totalTime(0);
-  for (std::pair<Vertex, Vertex> paar : queries) {
-    auto t1 = high_resolution_clock::now();
-    query(labels, paar.first, paar.second);
-    auto t2 = high_resolution_clock::now();
-    duration<double, std::nano> nano_double = t2 - t1;
-    totalTime += nano_double.count();
+  std::size_t counter = 0;
+  auto t1 = high_resolution_clock::now();
+  for (const std::pair<Vertex, Vertex> &paar : queries) {
+    counter += query(labels, paar.first, paar.second);
   }
 
-  std::cout << "The " << numQueries << " random queries took in total "
-            << totalTime << " [ms] and on average "
-            << (double)(totalTime / numQueries) << " [ns]!\n";
+  auto t2 = high_resolution_clock::now();
+  duration<double, std::nano> nano_double = t2 - t1;
+  long double total_ns = nano_double.count();
+  std::cout << numQueries << " queries: total " << total_ns << " ns, avg "
+            << (total_ns / numQueries) << " ns/query, counter=" << counter
+            << "\n";
 }
 template <typename LABEL = Label>
 std::size_t computeTotalBytes(const std::array<std::vector<LABEL>, 2> &labels) {
