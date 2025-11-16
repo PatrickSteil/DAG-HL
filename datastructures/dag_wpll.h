@@ -40,7 +40,7 @@
 #include "utils.h"
 
 template <int K = 128, class LABEL = Label>
-struct WeightedPLL {
+struct DAG_WPLL {
   static constexpr int NUM_NIBBLES = K / 4;
 
  public:
@@ -54,8 +54,8 @@ struct WeightedPLL {
 
   const int numThreads;
 
-  WeightedPLL(const Graph &fwdGraph, const Graph &bwdGraph,
-              const std::vector<std::size_t> &rankPar, const int numThreads = 1)
+  DAG_WPLL(const Graph &fwdGraph, const Graph &bwdGraph,
+           const std::vector<std::size_t> &rankPar, const int numThreads = 1)
       : labels{std::vector<LABEL>(), std::vector<LABEL>()},
         graph{&fwdGraph, &bwdGraph},
         rank(rankPar),

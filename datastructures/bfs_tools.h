@@ -348,4 +348,49 @@ class GenerationCheckerThreadSafe {
   std::atomic<GenerationType> generation;
 };
 
+struct Deque {
+  std::vector<int> data;
+  std::size_t head = 0;  // inclusive
+  std::size_t tail = 0;  // exclusive
+  std::size_t cap = 0;
+
+  explicit Deque(std::size_t capacity = 0) { resize(capacity); }
+
+  void resize(std::size_t n) {
+    data.clear();
+    data.resize(n);
+    cap = n;
+    reset();
+  }
+
+  void reset() noexcept { head = tail = 0; }
+
+  bool isEmpty() const noexcept { return head == tail; }
+
+  void pushBack(int v) noexcept {
+    data[tail] = v;
+    ++tail;
+    if (tail == cap) tail = 0;
+  }
+
+  void pushFront(int v) noexcept {
+    if (head == 0) head = cap;
+    --head;
+    data[head] = v;
+  }
+
+  int popFront() noexcept {
+    int v = data[head];
+    ++head;
+    if (head == cap) head = 0;
+    return v;
+  }
+
+  // size (may be useful for diagnostics)
+  std::size_t size() const noexcept {
+    if (tail >= head) return tail - head;
+    return cap - (head - tail);
+  }
+};
+
 }  // namespace bfs

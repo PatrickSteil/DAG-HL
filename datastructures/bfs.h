@@ -340,4 +340,66 @@ struct ParallelBFS {
   }
 };
 
+struct ZeroOneBFS {
+  const Graph &graph;
+  Deque q;
+  GenerationChecker<> processed;
+
+  ZeroOneBFS(const Graph &graph)
+      : graph(graph), q(graph.numVertices()), processed(graph.numVertices()) {}
+
+  void reset(std::size_t numVertices) {
+    q.resize(numVertices);
+    processed.reset();
+    processed.resize(numVertices);
+  }
+
+  template <typename FUNC>
+  void doForAllVerticesInQ(FUNC &&func) {
+    if (q.head <= q.tail) {
+      // continuous region [head, tail)
+      for (std::size_t i = q.head; i < q.tail; ++i) func(q.data[i]);
+    } else {
+      // two regions: [head, cap) and [0, tail)
+      for (std::size_t i = q.head; i < q.cap; ++i) func(q.data[i]);
+      for (std::size_t i = 0; i < q.tail; ++i) func(q.data[i]);
+    }
+  }
+
+  template <typename ON_POP = decltype([](const Vertex) { return false; }),
+            typename ON_RELAX = decltype([](const Vertex, const Vertex,
+                                            const Weight) { return false; })>
+  void run(const Vertex root, ON_POP &&onPop, ON_RELAX &&onRelax) {
+    q.reset();
+    processed.reset();
+
+    q.pushBack(root);
+
+    while (!q.isEmpty()) {
+      const Vertex u = q.popFront();
+      processed.mark(u);
+
+      if (onPop(u)) continue;
+
+      for (std::size_t i = graph.beginEdge(u), end = graph.endEdge(u); i < end;
+           ++i) {
+        if (i + 4 < end) {
+          PREFETCH(&graph.toVertex[i + 4]);
+        }
+        const Vertex w = graph.toVertex[i];
+
+        if (processed.isMarked(w)) continue;
+
+        const Weight dist = graph.weight[i];
+
+        if (onRelax(u, w, dist)) continue;
+
+        if (dist == 0)
+          q.pushFront(w);
+        else
+          q.pushBack(w);
+      }
+    }
+  }
+};
 };  // namespace bfs

@@ -67,6 +67,23 @@ struct Label {
         hubs.begin(), hubs.end(),
         [](const HubEntry &a, const HubEntry &b) { return a.node < b.node; });
   };
+
+  template <typename FUNC>
+  void doForAll(FUNC &&apply) {
+    for (std::size_t i = 0; i < hubs.size(); ++i) {
+      auto &h = hubs[i];
+      apply(h.node, h.dist);
+    }
+  }
+
+  bool prune(const std::vector<Weight> &lookup, const Weight newDistance) {
+    bool result = false;
+    doForAll([&](const Vertex h, const Weight dist) {
+      assert(h < lookup.size());
+      result |= lookup[h] + dist <= newDistance;
+    });
+    return result;
+  }
 };
 
 Weight query(std::array<std::vector<Label>, 2> &labels, const Vertex from,
@@ -181,6 +198,41 @@ void benchmark_hublabels(std::array<std::vector<Label>, 2> &labels,
   std::cout << numQueries << " queries: total " << total_ns << " ns, avg "
             << (total_ns / numQueries) << " ns/query, counter=" << counter
             << "\n";
+}
+
+void saveToFile(std::array<std::vector<Label>, 2> &labels,
+                const std::string &fileName) {
+  std::ofstream outFile(fileName);
+
+  if (!outFile.is_open()) {
+    std::cerr << "Error: Unable to open file " << fileName << " for writing.\n";
+    return;
+  }
+
+  std::size_t N = labels[FWD].size();
+
+  outFile << "V " << N << "\n";
+
+  for (std::size_t v = 0; v < N; ++v) {
+    outFile << "o " << v;
+    labels[FWD][v].doForAll([&](const Vertex hub, const Weight dist) {
+      outFile << " " << hub << " " << (int)dist;
+    });
+    outFile << "\n";
+
+    outFile << "i " << v;
+    labels[BWD][v].doForAll([&](const Vertex hub, const Weight dist) {
+      outFile << " " << hub << " " << (int)dist;
+    });
+    outFile << "\n";
+  }
+
+  outFile.close();
+  if (outFile.fail()) {
+    std::cerr << "Error: Writing to file " << fileName << " failed.\n";
+  } else {
+    std::cout << "Labels saved successfully to " << fileName << "\n";
+  }
 }
 
 std::size_t computeTotalBytes(const std::array<std::vector<Label>, 2> &labels) {

@@ -11,10 +11,11 @@
 #include <thread>
 #include <utility>
 
+#include "datastructures/dag_wpll.h"
 #include "datastructures/graph.h"
 #include "datastructures/hub_labels.h"
 #include "datastructures/topological_sort.h"
-#include "datastructures/weighted_pll.h"
+#include "datastructures/wpll.h"
 #include "external/cmdparser.hpp"
 
 void configure_parser(cli::Parser &parser) {
@@ -57,10 +58,19 @@ int main(int argc, char *argv[]) {
 
   const int K = 256;
 
-  WeightedPLL<K> hl(g, rev, rank);
+  std::array<std::vector<Label>, 2> labels{
+      std::vector<Label>(g.numVertices(), Label()),
+      std::vector<Label>(g.numVertices(), Label())};
+  std::array<const Graph *, 2> graph{&g, &rev};
+  /* DAG_WPLL<K> hl(g, rev, rank); */
+  WPLL<K> wpll(labels, graph);
 
-  std::vector<Vertex> ordering = getOrdering(orderingFile, hl.graph);
-  hl.run(ordering);
+  std::vector<Vertex> ordering = getOrdering(orderingFile, graph);
+  wpll.run(ordering);
+
+  wpll.sortLabels();
+
+  if (outputFileName != "") saveToFile(labels, outputFileName);
 
   return 0;
 }
