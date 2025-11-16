@@ -27,6 +27,8 @@ void configure_parser(cli::Parser &parser) {
       "File containing the ordering and the centrality measure per line");
   parser.set_optional<bool>("s", "show_stats", false,
                             "Show statistics about the computed hub labels.");
+  parser.set_optional<bool>("b", "benchmark_queries", false,
+                            "Runs a small (10,000) query benchmark");
 };
 
 int main(int argc, char *argv[]) {
@@ -37,7 +39,8 @@ int main(int argc, char *argv[]) {
   const std::string inputFileName = parser.get<std::string>("i");
   const std::string outputFileName = parser.get<std::string>("o");
   const std::string orderingFile = parser.get<std::string>("r");
-  const auto showstats = parser.get<bool>("s");
+  const bool showstats = parser.get<bool>("s");
+  const bool run_benchmark = parser.get<bool>("b");
 
   Graph g;
   g.readDimacs(inputFileName);
@@ -73,6 +76,10 @@ int main(int argc, char *argv[]) {
   if (showstats) showStats(labels);
 
   if (outputFileName != "") saveToFile(labels, outputFileName);
+
+  if (run_benchmark) {
+    benchmark_hublabels(hl.labels, 10000);
+  }
 
   return 0;
 }

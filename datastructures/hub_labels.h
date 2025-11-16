@@ -188,8 +188,8 @@ void benchmark_hublabels(std::array<std::vector<Label>, 2> &labels,
       generateRandomQueries<Vertex>(numQueries, 0, labels[FWD].size());
   std::size_t counter = 0;
   auto t1 = high_resolution_clock::now();
-  for (const std::pair<Vertex, Vertex> &paar : queries) {
-    counter += (query(labels, paar.first, paar.second) != noWeight);
+  for (const auto &[from, to] : queries) {
+    counter += (query(labels, from, to) != noWeight);
   }
 
   auto t2 = high_resolution_clock::now();
