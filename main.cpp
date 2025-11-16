@@ -50,12 +50,12 @@ int main(int argc, char *argv[]) {
     g.showStats();
   }
 
-  std::vector<std::size_t> rank(g.numVertices(), 0);
-  TopologicalSort sorter(g);
+  /* std::vector<std::size_t> rank(g.numVertices(), 0); */
+  /* TopologicalSort sorter(g); */
 
-  for (std::size_t i = 0; i < g.numVertices(); ++i) {
-    rank[sorter.getOrdering()[i]] = i;
-  }
+  /* for (std::size_t i = 0; i < g.numVertices(); ++i) { */
+  /*   rank[sorter.getOrdering()[i]] = i; */
+  /* } */
 
   Graph rev = g.reverseGraph();
 

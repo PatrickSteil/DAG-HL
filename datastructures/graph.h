@@ -172,10 +172,15 @@ struct Graph {
         std::istringstream iss(line);
         char a;
         Vertex u, v;
-        int w;
-        if (iss >> a >> u >> v >> w) {
-          edges.emplace_back(u - 1, v - 1, Weight(w));
+        int w = 1;
+
+        iss >> a >> u >> v;
+
+        if (!(iss >> w)) {
+          w = 1;
         }
+
+        edges.emplace_back(u - 1, v - 1, w);
       }
     }
 

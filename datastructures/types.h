@@ -15,6 +15,6 @@ typedef uint8_t Weight;
 
 constexpr Vertex noVertex = uint32_t(-1);
 constexpr Index noIndex = std::size_t(-1);
-constexpr Weight noWeight = uint8_t(-1);
+constexpr Weight noWeight = 15;
 
 enum DIRECTION : bool { FWD, BWD };

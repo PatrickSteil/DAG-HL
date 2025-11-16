@@ -2,4 +2,5 @@ build-*
 python*
 data/*
 result*
+datasets/*
 add_licences.sh

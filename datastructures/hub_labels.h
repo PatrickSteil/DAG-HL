@@ -328,9 +328,8 @@ std::vector<Vertex> getOrdering(const std::string &fileName,
     while (std::getline(file, line)) {
       std::istringstream iss(line);
       Vertex vertex;
-      double centrality;
 
-      if (iss >> vertex >> centrality) {
+      if (iss >> vertex) {
         ordering.push_back(vertex - 1);
       } else {
         throw std::runtime_error("Failed to parse line: " + line);

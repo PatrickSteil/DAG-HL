@@ -68,7 +68,7 @@ struct WPLL {
     init(ordering.size());
 
     for (std::size_t i = 0; i < ordering.size(); ++i) {
-      runPrunedBFS(ordering[i]);
+      runPrunedBFS(i, ordering[i]);
     }
   }
 
@@ -85,8 +85,9 @@ struct WPLL {
 
   void resetDistance(const DIRECTION dir) { distance[dir].reset(); }
 
-  void runPrunedBFS(const Vertex v) {
+  void runPrunedBFS(const std::size_t index, const Vertex v) {
     assert(v < labels[BWD].size());
+    /* bool DEBUG = (index == 0); */
 
     setLookup(v);
 
@@ -97,11 +98,23 @@ struct WPLL {
       bfs[dir].run(
           v,
           [&](const Vertex u) {
+            /* if (DEBUG) { */
+            /*   std::cout << "Popped " << u */
+            /*             << " with dist: " << (int)(distance[dir].get(u)) */
+            /*             << std::endl; */
+            /* } */
             if (distance[dir].get(u) == noWeight) return true;
             labels[!dir][u].add(v, distance[dir].get(u));
             return false;
           },
           [&](const Vertex u, const Vertex w, const Weight dist) {
+            /* if (DEBUG) { */
+            /*   std::cout << "Relax edge " << u << " [" */
+            /*             << (int)distance[dir].get(u) << "] -> " << w << "["
+             */
+            /*             << (int)distance[dir].get(w) << "] weight; " */
+            /*             << (int)dist << std::endl; */
+            /* } */
             bool prune = true;
             const Weight newDistance = distance[dir].get(u) + dist;
             if (newDistance < distance[dir].get(w)) {
