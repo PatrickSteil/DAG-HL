@@ -63,12 +63,14 @@ int main(int argc, char *argv[]) {
       std::vector<Label>(g.numVertices(), Label())};
   std::array<const Graph *, 2> graph{&g, &rev};
   /* DAG_WPLL<K> hl(g, rev, rank); */
-  WPLL<K> wpll(labels, graph);
+  WPLL<K> hl(labels, graph);
 
   std::vector<Vertex> ordering = getOrdering(orderingFile, graph);
-  wpll.run(ordering);
+  hl.run(ordering);
 
-  wpll.sortLabels();
+  sortLabels(labels);
+
+  if (showstats) showStats(labels);
 
   if (outputFileName != "") saveToFile(labels, outputFileName);
 

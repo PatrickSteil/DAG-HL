@@ -343,15 +343,15 @@ struct ParallelBFS {
 struct ZeroOneBFS {
   const Graph &graph;
   Deque q;
-  GenerationChecker<> processed;
+  GenerationChecker<> seen;
 
   ZeroOneBFS(const Graph &graph)
-      : graph(graph), q(graph.numVertices()), processed(graph.numVertices()) {}
+      : graph(graph), q(graph.numVertices()), seen(graph.numVertices()) {}
 
   void reset(std::size_t numVertices) {
     q.resize(numVertices);
-    processed.reset();
-    processed.resize(numVertices);
+    seen.reset();
+    seen.resize(numVertices);
   }
 
   template <typename FUNC>
@@ -371,13 +371,13 @@ struct ZeroOneBFS {
                                             const Weight) { return false; })>
   void run(const Vertex root, ON_POP &&onPop, ON_RELAX &&onRelax) {
     q.reset();
-    processed.reset();
+    seen.reset();
 
     q.pushBack(root);
+    seen.mark(root);
 
     while (!q.isEmpty()) {
       const Vertex u = q.popFront();
-      processed.mark(u);
 
       if (onPop(u)) continue;
 
@@ -388,7 +388,8 @@ struct ZeroOneBFS {
         }
         const Vertex w = graph.toVertex[i];
 
-        if (processed.isMarked(w)) continue;
+        if (seen.isMarked(w)) continue;
+        seen.mark(w);
 
         const Weight dist = graph.weight[i];
 
