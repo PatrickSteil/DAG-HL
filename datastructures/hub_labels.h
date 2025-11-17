@@ -211,6 +211,7 @@ void saveToFile(std::array<std::vector<Label>, 2> &labels,
 
   std::size_t N = labels[FWD].size();
 
+  outFile << "c Weighted\n";
   outFile << "V " << N << "\n";
 
   for (std::size_t v = 0; v < N; ++v) {
